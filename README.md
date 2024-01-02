@@ -1,6 +1,6 @@
 # IsoVEM: Isotropic Reconstruction for Volume Electron Microscopy Based on Transformer
 
-This repository `EMformer` is the official implementation of the bioRxiv paper(https://www.biorxiv.org/content/10.1101/2023.11.22.567807v3).
+This repository `IsoVEM` is the official implementation of the bioRxiv paper(https://www.biorxiv.org/content/10.1101/2023.11.22.567807v3).
 
 ## Usage
 
@@ -54,6 +54,7 @@ The network code is based on [VRT(Video Restoration Transformer)](https://arxiv.
 
 If you find this repository useful in your research, please cite our paper:
 
+```
 @article {He2023.11.22.567807,
 	author = {Jia He and Yan Zhang and Wenhao Sun and Ge Yang and Fei Sun},
 	title = {IsoVEM: Isotropic Reconstruction for Volume Electron Microscopy Based on Transformer},
@@ -65,3 +66,4 @@ If you find this repository useful in your research, please cite our paper:
 	eprint = {https://www.biorxiv.org/content/early/2023/12/27/2023.11.22.567807.full.pdf},
 	journal = {bioRxiv}
 }
+```
