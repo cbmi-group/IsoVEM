@@ -1,9 +1,19 @@
+import itertools
+from tqdm import tqdm
+import time
+
 def get_crop_num(length,crop_size=128,overlap=16):
-    '''length=n*crop_size-(n-1)*overlap'''
+    '''
+    calculate the number of overlapping cropping
+    length=n*crop_size-(n-1)*overlap
+    '''
     num=(length-overlap)/(crop_size-overlap)
     return math.ceil(num)
 
 def create_coord(s1,s2=(128,128,128),overlap=16):
+    '''
+    calculate the cropping coordinates to extract subvolumes
+    '''
     coord_ls=[[],[],[]]
     z_crop_num=get_crop_num(s1[0],crop_size=s2[0],overlap=overlap)
     y_crop_num=get_crop_num(s1[1],crop_size=s2[1],overlap=overlap)
@@ -20,7 +30,24 @@ def create_coord(s1,s2=(128,128,128),overlap=16):
     return np.array(coord_ls),z_crop_num,y_crop_num,x_crop_num
 
 
-def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tta=True,artifact=False,debris=False):
+def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tta=True,uncertainty=False,debris=False):
+    '''
+    model inference.
+    :param model: pretrained isovem/isovem+ model
+    :param test_h5: test data wait for processing
+    :param scale_factor: the scale factor of isotropic reconstruction, it can be different from training phase.
+    :param image_shape: the subvolume size for model inference.
+    :param overlap: the overlapped voxel for subvolumes stitching
+    :param tta: if true, perform test time augmentation based on 8 orthogonal rotations
+    :param uncertainty: if true, get model uncertainty map rather than isotropic reconstruction results. need to set test_tta=True.
+    :param debris: if true, perform slice inpainting, need to set test_tta=True and test_upscale=1. if false, perform isotropic reconstruction.
+
+    case1: tta=True,uncertainty=False,debris=False, perform isotropic reconstruction, for IsoVEM or IsoVEM+'s stage2.
+    case2: tta=True,uncertainty=True,debris=False, generate model uncertainty map for fidelity evaluation.
+    case3: tta=True,uncertainty=False,debris=True, perform slice inpainting for IsoVEM+ stage1.
+    case4: tta=False,uncertainty=False,debris=False, perform simpler isotropic reconstruction.
+    '''
+
     # ----------
     #  Crop Subvolumes
     # ----------
@@ -38,34 +65,38 @@ def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tt
             # ----------
             #  Inference on Subvolumes
             # ----------
-            if tta:# TTA by 8 rotations
+            if tta:# test-time augmentation by 8 rotations
                 batch_rot_ls = rotate_8(batch)
                 pred_rot_ls = []
-                for j in range(0, len(batch_rot_ls)):
+
+                for j in range(0, len(batch_rot_ls)): # for each rotated subvolume
                     batch_rot = batch_rot_ls[j]
-                    if debris:
+                    if debris: # if true, change processing axis
                         batch_rot = batch_rot.permute(0, 1, 3, 2, 4)
+
+                    # model inference
                     batch_rot=batch_rot.squeeze().permute(1, 0, 2).unsqueeze(1).unsqueeze(0)
-                    # batch_rot = transforms.Normalize([0.5], [0.5])(batch_rot)
+                    assert(scale_factor==1 if debris else True)
                     pred_rot = model(x=batch_rot,current_scale=scale_factor)
-                    # pred_rot = 0.5 * (pred_rot + 1.0)
                     pred_rot =pred_rot.squeeze().permute(1,0,2).unsqueeze(0).unsqueeze(0)
-                    if debris:
+
+                    if debris: # if true, change processing axis
                         pred_rot = pred_rot.permute(0, 1, 3, 2, 4)
                     pred_rot_ls.append(pred_rot)
                 image_shape_=(pred_rot.shape[2],pred_rot.shape[3],pred_rot.shape[4])
-                if artifact:
+
+                if uncertainty:# visualize model uncertainty map
                     pred_ls,_=anti_rotate_8(pred_rot_ls, image_shape_)
                     pred_ls=[item.squeeze().cpu().detach().numpy() for item in pred_ls]
                     pred=np.std(np.array(pred_ls),axis=0)
-                else:
+                else:# visualize isotropic reconstruction results
                     _, pred = anti_rotate_8(pred_rot_ls, image_shape_)
                     pred = pred.squeeze().cpu().detach().numpy()
+
             else:# no TTA
+                # model inference
                 batch = batch.squeeze().permute(1, 0, 2).unsqueeze(1).unsqueeze(0)
-                # batch_rot = transforms.Normalize([0.5], [0.5])(batch_rot)
                 pred = model(x=batch,current_scale=scale_factor)
-                # pred_rot = 0.5 * (pred_rot + 1.0)
                 pred=pred.squeeze().permute(1,0,2).cpu().detach().numpy()
             vol_ls.append(pred)
 
@@ -95,7 +126,7 @@ def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tt
     # ----------
     #  3D Stitch
     # ----------
-    # stitch along x axis
+    # 3d stitch along x axis
     x_ls=[]
     for i in range(z_crop_num):
         for j in range(y_crop_num):
@@ -109,7 +140,7 @@ def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tt
                 else:
                     x_temp = vol_ls[nps]
             x_ls.append(x_temp)
-    # stitch along y axis
+    # 3d stitch along y axis
     y_ls=[]
     for i in range(z_crop_num):
         y_temp = None
@@ -122,7 +153,7 @@ def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tt
             else:
                 y_temp = x_ls[nps]
         y_ls.append(y_temp)
-    # stitch along z axis
+    # 3d stitch along z axis
     z_temp=None
     for i in range(z_crop_num):
         if z_temp is not None:
@@ -133,18 +164,12 @@ def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tt
             z_temp = y_ls[i]
 
     # ----------
-    #  Save Final Results
+    #  Return Final Results
     # ----------
     z_temp[z_temp < 0] = 0
     z_temp[z_temp > 1] = 1
     res=(z_temp* 255).astype('uint8')
     return res
-
-
-def save_h5(input_h5,save_pth):
-    h5 = h5py.File(save_pth, 'w')
-    h5['raw'] = input_h5
-    h5.close()
 
 
 if __name__ == '__main__':
@@ -158,43 +183,50 @@ if __name__ == '__main__':
     # ----------
     #  Preparing
     # ----------
-    import itertools
-    from tqdm import tqdm
-    import time
     from dataset import *
     from metric import *
     from utils import *
 
+    # device
     cuda = torch.cuda.is_available()
     Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
-    save_dir = os.path.join(opt.test_dir,opt.test_model.split('/')[-2] + '_' +
-                            opt.test_model.split('/')[-1].split('.')[0])+'_'+str(opt.test_tta)
+
+    # save path
+    save_dir = os.path.join(opt.test_dir,opt.test_model.split('/')[-2]+'_'+opt.test_model.split('/')[-1].split('.')[0])
     os.makedirs(save_dir, exist_ok=True)
-    pred_name=os.path.join(save_dir,'pred.h5')
+    pred_name=os.path.join(save_dir,'pred.tif')
     print(pred_name)
+
+    # ----------
+    #  Load data
+    # ----------
+    tic = time.time()
+    input_h5 = io.imread(opt.test_h5)
 
     # ----------
     #  Model Inference
     # ----------
-    tic = time.time()
-    input_h5 = h5py.File(opt.test_h5, 'r')['raw']
     model = torch.load(opt.test_model).eval()
     pred_h5 = run_model(model, input_h5, opt.test_upscale, opt.test_shape, opt.test_overlap,
-                        tta=opt.test_tta, artifact=opt.test_artifact,debris=opt.test_debris)
-    save_h5(pred_h5, pred_name)
+                        tta=opt.test_tta, uncertainty=opt.test_uncertainty,debris=opt.test_debris)
+
+    # ----------
+    #  Save results
+    # ----------
+    io.imsave(pred_name,pred_h5)
     tac = time.time()
     print("Testing costs{:.2f} min".format((tac - tic) / 60))
 
     # ----------
-    #  Evaluation
+    #  If gt exists, perform metric evaluation.
     # ----------
     if opt.test_gt:
         import time
         print('Start:', time.strftime('%Y-%m-%d %H:%M:%S'))
         tic = time.time()
 
-        test_h5 = np.array(h5py.File(opt.test_gt, 'r')['raw'])
-        pred_h5 = np.array(h5py.File(pred_name, 'r')['raw'])
+        test_h5 = io.imread(opt.test_gt)
+        pred_h5 = io.imread(pred_name)
         assert (pred_h5.shape == test_h5.shape)
         calculate_metrics(pred_h5, test_h5, save_json=pred_name+"_metric.json", is_cuda=False)
 

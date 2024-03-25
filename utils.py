@@ -6,6 +6,11 @@ cuda = torch.cuda.is_available()
 Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
 
 def rotate_8(imgs_hr):
+    '''
+    8 kinds of orthogonal rotations, keeping anisotropic axis unchanged.
+    imgs_hr should be a 3d data with (Z,Y,X) order.
+    utils for test-time-augmentation.
+    '''
     alpha_ls = [-2,0]
     beta_ls = [-2]
     gamma_ls = [-2, -1,0,1]
@@ -25,6 +30,11 @@ def rotate_8(imgs_hr):
 
 
 def anti_rotate_8(imgs_hr_ls,image_shape=(128,128,128)):
+    '''
+    anti-rotation for 8 kinds of orthogonal rotations.
+    images in imgs_hr_ls should be 3d data with (Z,Y,X) order.
+    utils for test-time-augmentation.
+    '''
     alpha_ls = [-2, 0]
     beta_ls = [-2]
     gamma_ls = [-2, -1, 0, 1]
@@ -47,6 +57,7 @@ def anti_rotate_8(imgs_hr_ls,image_shape=(128,128,128)):
 
 
 def blend_X(img1, img2, overlap):
+    '''2d stitch along X axis, utils for 3d subvolume stitching.'''
     b, a = img1.shape
     d, c = img2.shape
     res = np.zeros([b, a+c - overlap]).astype(np.float16)
@@ -68,6 +79,7 @@ def blend_X(img1, img2, overlap):
     return res
 
 def blend_Y(img1, img2, overlap):
+    '''2d stitch along Y axis, utils for 3d subvolume stitching.'''
     b, a = img1.shape
     d, c = img2.shape
     res = np.zeros([b+d - overlap, a]).astype(np.float16)
@@ -88,6 +100,7 @@ def blend_Y(img1, img2, overlap):
     return res
 
 def blend3D_X(img1, img2, overlap=16):
+    '''3d stitch along X axis, utils for 3d subvolume stitching.'''
     c, b, a = img1.shape
     z, y, x = img2.shape
     res = np.zeros([c, b, a+x - overlap]).astype(np.float16)
@@ -97,6 +110,7 @@ def blend3D_X(img1, img2, overlap=16):
 
 
 def blend3D_Y(img1, img2, overlap=16):
+    '''3d stitch along Y axis, utils for 3d subvolume stitching.'''
     c, b, a = img1.shape
     z, y, x = img2.shape
     res = np.zeros([c, b + y - overlap, a]).astype(np.float16)
@@ -106,6 +120,7 @@ def blend3D_Y(img1, img2, overlap=16):
 
 
 def blend3D_Z(img1, img2, overlap=16):
+    '''3d stitch along Z axis, utils for 3d subvolume stitching.'''
     c, b, a = img1.shape
     z, y, x = img2.shape
     res = np.zeros([c + z - overlap, b, a]).astype(np.float16)

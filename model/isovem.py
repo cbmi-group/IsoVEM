@@ -189,9 +189,8 @@ def compute_mask(D, H, W, window_size, shift_size, device):
 
 
 class PixelShuffle_Iso(nn.Module):
-    """ isotropic pixel shuffle
-    https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/pixelshuffle.py
-    https://github.com/pytorch/pytorch/blob/3a66a1cb99d7e1c1fe7abf8f390e177b9183a436/aten/src/ATen/native/PixelShuffle.cpp#L13-L58
+    """
+    Custom anisotropic pixel shuffle.
     """
 
     def __init__(self):
@@ -791,10 +790,10 @@ class Stage(nn.Module):
         return x
 
 
-class EMformer(nn.Module):
-    """ Video Restoration Transformer (VRT).
-        A PyTorch impl of : `VRT: A Video Restoration Transformer`  -
-          https://arxiv.org/pdf/2201.00000
+class IsoVEM(nn.Module):
+    """
+     Video Restoration Transformer (VRT).
+        A PyTorch impl of : `VRT: A Video Restoration Transformer`  -https://arxiv.org/pdf/2201.00000
 
     Args:
         upscale (int): Upscaling factor. Set as 1 for video deblurring, etc. Default: 4.

@@ -1,5 +1,7 @@
-# use Visualizer tool to visualize attention map
-# https://github.com/luo3300612/Visualizer
+'''
+visualize attention map of IsoVEM based on Visualizer tool
+https://github.com/luo3300612/Visualizer
+'''
 
 import os
 import sys
@@ -7,6 +9,7 @@ sys.path.append("..")
 from dataset import *
 from metric import *
 import cv2
+import h5py
 from visualizer import get_local
 
 def idx2coord(idx,window_size):
@@ -47,7 +50,7 @@ def vis_attmap(model,input,save_dir,idx_depth,window_size,idx_window,idx_query):
     #     io.imsave(os.path.join(save_dir, 'img_%04d' % (idx_window_) + '_02.tif'), image[2])
     #     io.imsave(os.path.join(save_dir, 'img_%04d' % (idx_window_) + '_03.tif'), image[3])
 
-    # figure
+    # plot figure
     import matplotlib.pyplot as plt
     plt.figure()
 
@@ -92,19 +95,27 @@ def vis_attmap(model,input,save_dir,idx_depth,window_size,idx_window,idx_query):
 
 
 if __name__ == '__main__':
-    input_pth = "/mnt/data1/EMData/Data/1220/test_4.h5"
-    scale_factor = 4
-    ckpt_pth = "/mnt/data1/EMData/D_Ours/6_VRT/ckpt/VRT_1_23/model_epoch_230.pth"
-    save_dir = "/mnt/data1/EMData/Figure/figure1/attmap/VRT_1_23_0"
+    # ----------
+    #  Preparing
+    # ----------
+    input_pth = "data/epfl/test_8.tif" # test data path
+    scale_factor = 8 # scale factor during inference
+    ckpt_pth = "ckpt/epfl-8/model_epoch_1.pth" # pretrained checkpoint
+    save_dir = "attmap/epfl-8" # save path
     os.makedirs(save_dir, exist_ok=True)
 
-    roi = np.s_[70:70 + 64, 56:56 + 16, 1138:1138 + 256]
-    idx_depth=3 # depths=[4,4,4,4,4,4,4, 2,2,2,2, 2,2], choose self-attention-only and no-downsample layer in TMSAG
-    window_size = [4,8,32]
-    # idx_window_ls=[167,  0,94,  8,72,  17,202] # Monolayer, Vesicle, Bilayer
-    # idx_query_ls= [84,  133,174,  92,89,  179,114] # Monolayer, Vesicle, Bilayer
-    idx_window=167 # img_size=[16,64,256]//window_size=[4,8,32]=256
-    idx_query=84 # window_size=[4,8,32]
+    # ----------
+    #  Define roi, layer, window, query
+    # ----------
+    roi = np.s_[70:70 + 64, 56:56 + 16, 1138:1138 + 256] # roi of input volume, such as region containing bilayer
+    idx_depth=3 # idx range: the length of config.depths list. choose self-attention-only and no-downsample layer in TMSAG
+    window_size = [4,8,32] # window size for visualization
+    idx_window=167 # idx range: img_size=[16,64,256]//window_size=[4,8,32]=256
+    idx_query=84 # idx range: window_size=[4,8,32], 8*32=256
+
+    # ----------
+    #  Attention Map Visualization
+    # ----------
     get_local.activate()
     input = h5py.File(input_pth, 'r')['raw'][roi]
     model = torch.load(ckpt_pth).eval()

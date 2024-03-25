@@ -1,3 +1,3 @@
-from .emformer import EMformer
+from .isovem import IsoVEM
 
-__all__=['EMformer']
+__all__=['IsoVEM']

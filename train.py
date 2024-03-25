@@ -1,6 +1,7 @@
 # ----------
 #  Configs
 # ----------
+print("===> Loading configurations")
 import sys
 import configs
 opt = configs.get_EPFL_configs()
@@ -9,6 +10,7 @@ print(opt)
 # ----------
 #  Preparing
 # ----------
+print("===> Preparing environment")
 from dataset import *
 from model import *
 from metric import *
@@ -27,12 +29,14 @@ os.makedirs(os.path.join(opt.valid_dir,opt.exp_name),exist_ok=True)
 #  Datasets
 # ----------
 print("===> Loading datasets")
+# loading training dataset
 train_dataloader = DataLoader(
     ImageDataset_train(image_h5=opt.train_h5, image_shape=opt.train_shape, scale_factor=opt.upscale, is_gt=opt.train_gt, is_inpaint=opt.inpaint),
     batch_size=opt.batch_size,
     shuffle=True,
     num_workers=opt.n_cpu,
 )
+# loading validation dataset
 val_dataloader = DataLoader(
     ImageDataset_val(image_h5=opt.val_h5, image_shape=opt.val_shape, scale_factor=opt.upscale, is_gt=opt.val_gt, is_inpaint=opt.inpaint),
     batch_size=opt.batch_size,
@@ -44,11 +48,11 @@ val_dataloader = DataLoader(
 #  Model
 # ----------
 print("===> Building models")
-if opt.pretrain_model:
+if opt.pretrain_model: # loading pretrained model
     model=torch.load(opt.pretrain_model)
     opt.start_epoch = int(opt.pretrain_model.split('/')[-1].split('.')[-2].split('_')[-1])+ 1
-else:
-    model = EMformer(upscale=opt.upscale,
+else: # create a new model
+    model = IsoVEM(upscale=opt.upscale,
                 img_size=opt.img_size,
                 window_size=opt.window_size,
                 depths=opt.depths,
@@ -56,20 +60,23 @@ else:
                 embed_dims=opt.embed_dims,
                 num_heads=opt.num_heads)
 
+# create optimizer
 print("===> Setting Optimizer")
 optimizer_G = optim.Adam(model.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
+# load to cuda
 if cuda:
     print("===> Setting CUDA")
     model = model.cuda()
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
 
+
 # ----------
 #  Training
 # ----------
 print("===> Training")
-loss_record = np.zeros(shape=(opt.end_epoch, 8))
+loss_record = np.zeros(shape=(opt.end_epoch, 8)) # recording losses and metrics
 for epoch in range(opt.start_epoch, opt.end_epoch+1):
     model.train()
 
@@ -77,15 +84,24 @@ for epoch in range(opt.start_epoch, opt.end_epoch+1):
     print("Epoch={}, lr={}".format(epoch, optimizer_G.param_groups[0]["lr"]))
 
     for iter, batch in enumerate(train_dataloader, 1):
+        # --------------
+        #  Read data
+        # --------------
         imgs_hr = Variable(batch["hr"].type(Tensor))
         imgs_lr = Variable(batch["lr"].type(Tensor))
 
         optimizer_G.zero_grad()
 
+        # --------------
+        #  Perform x/y-axis isotropic reconstruction
+        # --------------
         # imgs_lr=transforms.Normalize([0.5], [0.5])(imgs_lr)
         gen_hr = model(imgs_lr,current_scale=opt.upscale)
         # gen_hr = 0.5 * (gen_hr + 1.0)
 
+        # --------------
+        #  Loss function
+        # --------------
         loss_l2 = torch.nn.L1Loss()(gen_hr, imgs_hr)
         loss_ssim = 1 - ssim(gen_hr, imgs_hr, data_range=1)
         loss_G = loss_l2 + loss_ssim
@@ -108,6 +124,9 @@ for epoch in range(opt.start_epoch, opt.end_epoch+1):
     loss_total_ls=[x/len(train_dataloader) for x in loss_total_ls]
     loss_record[epoch-1,0:3] = loss_total_ls[:]
 
+    # --------------
+    #  Save checkpoints.
+    # --------------
     if opt.ckpt_interval != -1 and epoch % opt.ckpt_interval == 0:
         model_save_path=os.path.join(opt.ckpt_dir,opt.exp_name)
         torch.save(model, os.path.join(model_save_path,"model_epoch_{}.pth".format(epoch)))
@@ -120,10 +139,16 @@ for epoch in range(opt.start_epoch, opt.end_epoch+1):
         model.eval()
         val_metirc_ls = [0, 0, 0, 0]
         for val_iter, val_batch in enumerate(val_dataloader):
+            # --------------
+            #  Read data
+            # --------------
             val_img_hr_0 = Variable(val_batch["gt"].type(Tensor))
             val_img_hr_1 = Variable(val_batch["hr"].type(Tensor))
             val_img_hr_2 = Variable(val_batch["lr"].type(Tensor))
 
+            # --------------
+            #  Perform x/y-axis isotropic reconstruction
+            # --------------
             # val_img_hr_2 = transforms.Normalize([0.5], [0.5])(val_img_hr_2)
             val_gen_hr_2 = model(x=val_img_hr_2, current_scale=opt.upscale)
             # val_gen_hr_2 =0.5 * (val_gen_hr_2 + 1.0)
@@ -131,6 +156,9 @@ for epoch in range(opt.start_epoch, opt.end_epoch+1):
             val_ssim_2 = compute_ssim(val_gen_hr_2, val_img_hr_1, need_2d=False)[0]
             val_psnr_2 = compute_psnr(val_gen_hr_2, val_img_hr_1, need_2d=False)[0]
 
+            # --------------
+            #  When gt exists, perform z-axis isotropic reconstruction
+            # --------------
             if opt.val_gt:
                 val_gen_hr_1 = model(x=val_img_hr_1.permute(0,3,2,1,4),current_scale=opt.upscale)
                 val_ssim_1 = compute_ssim(val_gen_hr_1, val_img_hr_0.permute(0,3,2,1,4), need_2d=False)[0]
@@ -140,12 +168,18 @@ for epoch in range(opt.start_epoch, opt.end_epoch+1):
                 val_ssim_1 = torch.tensor(0)
                 val_psnr_1 = torch.tensor(0)
 
+            # --------------
+            #  Save visualization results.
+            # --------------
             if val_iter==0:
                 image_savedir =os.path.join(opt.valid_dir, opt.exp_name, "%04d" % epoch+'.tif')
                 val_gen_hr_1_np=val_gen_hr_1.permute(0,3,2,1,4)[0,:,:,:,:].squeeze().float().cpu().clamp_(0, 1).numpy()
                 io.imsave(image_savedir,(val_gen_hr_1_np*255).astype('uint8'))
                 print('Validation volume of epoch {} is saved to {}'.format(epoch, image_savedir))
 
+            # --------------
+            #  Save validation metrics.
+            # --------------
             val_metirc_ls[0] += val_ssim_1
             val_metirc_ls[1] += val_psnr_1
             val_metirc_ls[2] += val_ssim_2

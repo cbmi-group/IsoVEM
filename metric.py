@@ -11,6 +11,7 @@ cuda = torch.cuda.is_available()
 Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
 
 def compute_ssim(arr1, arr2,need_2d=True):
+    '''ssim calculation on 3D, XY, XZ, YZ'''
     ssim_ls=[]
     ssim_3d = ssim(arr1, arr2,win_size=11,data_range=1)
     ssim_ls.append(ssim_3d.item())
@@ -28,6 +29,7 @@ def compute_ssim(arr1, arr2,need_2d=True):
     return ssim_ls
 
 def compute_ms_ssim(arr1, arr2,need_2d=True):
+    '''ms-ssim calculation on 3D, XY, XZ, YZ'''
     ms_ssim_ls=[]
     ms_ssim_3d = ms_ssim(arr1, arr2,win_size=5, data_range=1)
     ms_ssim_ls.append(ms_ssim_3d.item())
@@ -46,6 +48,7 @@ def compute_ms_ssim(arr1, arr2,need_2d=True):
 
 
 def compute_psnr(arr1, arr2,need_2d=True):
+    '''psnr calculation on 3D, XY, XZ, YZ'''
     psnr_ls=[]
     mse_3d=nn.MSELoss()(arr1, arr2)
     psnr_3d = 20 * math.log10(1 / math.sqrt(mse_3d.item()))
@@ -66,16 +69,9 @@ def compute_psnr(arr1, arr2,need_2d=True):
 
     return psnr_ls
 
-
-def error_map(arr1, arr2,save_dir):
-    err=torch.abs(arr1-arr2)
-    err_np=np.array(err.squeeze()*255).astype('uint8')
-    io.imsave(os.path.join(save_dir,'error_map.tif'),err_np)
-
 def compute_lpips(arr1, arr2, need_2d=True):
     '''
-    LPIPS: Learned Perceptual Image Patch Similarity
-    Paper: A Neural Algorithm of Artistic Style Association for Research in Vision and Ophthalmology (ARVO)
+    lpips calculation on XY, XZ, YZ
     Usage: conda install piq -c photosynthesis-team -c conda-forge -c PyTorch
     '''
     from piq import LPIPS
@@ -96,8 +92,15 @@ def compute_lpips(arr1, arr2, need_2d=True):
         lpips_ls.extend([lpips_xy.item(), lpips_xz.item(), lpips_yz.item()])
     return lpips_ls
 
+def error_map(arr1, arr2,save_dir):
+    '''visualize the error map'''
+    err=torch.abs(arr1-arr2)
+    err_np=np.array(err.squeeze()*255).astype('uint8')
+    io.imsave(os.path.join(save_dir,'error_map.tif'),err_np)
+
 
 def calculate_metrics(arr1,arr2,save_json=None,is_cuda=False,vis_error=False):
+    '''calculate performance metrics, and save to json.'''
     assert arr1.shape == arr2.shape
     arr1 = torch.tensor(arr1[np.newaxis, np.newaxis, ...]/255.0)
     arr2 = torch.tensor(arr2[np.newaxis, np.newaxis, ...]/255.0)

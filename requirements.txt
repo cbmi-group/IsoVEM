@@ -11,9 +11,11 @@ pytorch-msssim==1.0.0
 scikit-image==0.19.3
 scipy==1.7.3
 tensorboardX==2.6.2.2
-tifffile==2021.11.2
-torch==1.8.1
-torchaudio==0.8.0a0+e4e171a
-torchvision==0.9.1
+tifffile==2022.8.12
+torch==1.8.1+cu111
+torchaudio==0.8.1
+torchfile==0.1.0
+torchstat==0.0.7
+torchvision==0.9.1+cu111
 tqdm==4.66.1
-visualizer==0.0.1
+piq==0.7.0
