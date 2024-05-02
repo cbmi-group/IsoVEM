@@ -20,6 +20,8 @@ conda activate isovem
 pip install -r requirements.txt
 ```
 
+The typical install time for these packages is within 1 hour.
+
 #### 2.Configuration
 
 The predefined config files are provided in`configs/epfl.py` or  `configs/cremi.py`. The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
@@ -91,13 +93,13 @@ import configs
 opt = configs.get_EPFL_configs()
 ```
 
-Run the training code as follows.
+Run the training code as follows. The typical training time for demo data costs several hours. 
 
 ```
 python train.py 
 ```
 
-Run the testing code as follows.
+Run the testing code as follows. The typical testing time for demo data costs 20 mins.
 
 ```
 python test.py 
