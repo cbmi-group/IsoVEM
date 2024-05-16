@@ -1,235 +1,192 @@
-import itertools
+import json
+import argparse
+from utils import add_dict_to_argparser
+import os
+from dataset import *
+from metric import *
+from utils import *
 from tqdm import tqdm
-import time
+import sys
 
-def get_crop_num(length,crop_size=128,overlap=16):
+def run_model_inpaint(model,image,idx_ls, args):
     '''
-    calculate the number of overlapping cropping
-    length=n*crop_size-(n-1)*overlap
+    model inference for slice inpainting.
+    :param model: pretrained isovem model
+    :param image: test data wait for processing
+    :param idx_ls: the list of slice index (start from 0) along Z-axis to be inpainted.
     '''
-    num=(length-overlap)/(crop_size-overlap)
-    return math.ceil(num)
-
-def create_coord(s1,s2=(128,128,128),overlap=16):
-    '''
-    calculate the cropping coordinates to extract subvolumes
-    '''
-    coord_ls=[[],[],[]]
-    z_crop_num=get_crop_num(s1[0],crop_size=s2[0],overlap=overlap)
-    y_crop_num=get_crop_num(s1[1],crop_size=s2[1],overlap=overlap)
-    x_crop_num=get_crop_num(s1[2],crop_size=s2[2],overlap=overlap)
-
-    for z,y,x in itertools.product(range(z_crop_num), range(y_crop_num),range(x_crop_num)):
-        z_coord = s2[0]//2 + z * (s2[0] - overlap) if (s2[0]//2 + z * (s2[0] - overlap)) < s1[0] - s2[0]//2 else s1[0] - s2[0]//2
-        y_coord = s2[1]//2 + y * (s2[1] - overlap) if (s2[1]//2 + y * (s2[1] - overlap)) < s1[1] - s2[1]//2 else s1[1] - s2[1]//2
-        x_coord = s2[2]//2 + x * (s2[2] - overlap) if (s2[2]//2 + x * (s2[2] - overlap)) < s1[2] - s2[2]//2 else s1[2] - s2[2]//2
-        coord_ls[0].append(z_coord)
-        coord_ls[1].append(y_coord)
-        coord_ls[2].append(x_coord)
-
-    return np.array(coord_ls),z_crop_num,y_crop_num,x_crop_num
-
-
-def run_model(model,test_h5,scale_factor,image_shape=(128,128,128),overlap=16,tta=True,uncertainty=False,debris=False):
-    '''
-    model inference.
-    :param model: pretrained isovem/isovem+ model
-    :param test_h5: test data wait for processing
-    :param scale_factor: the scale factor of isotropic reconstruction, it can be different from training phase.
-    :param image_shape: the subvolume size for model inference.
-    :param overlap: the overlapped voxel for subvolumes stitching
-    :param tta: if true, perform test time augmentation based on 8 orthogonal rotations
-    :param uncertainty: if true, get model uncertainty map rather than isotropic reconstruction results. need to set test_tta=True.
-    :param debris: if true, perform slice inpainting, need to set test_tta=True and test_upscale=1. if false, perform isotropic reconstruction.
-
-    case1: tta=True,uncertainty=False,debris=False, perform isotropic reconstruction, for IsoVEM or IsoVEM+'s stage2.
-    case2: tta=True,uncertainty=True,debris=False, generate model uncertainty map for fidelity evaluation.
-    case3: tta=True,uncertainty=False,debris=True, perform slice inpainting for IsoVEM+ stage1.
-    case4: tta=False,uncertainty=False,debris=False, perform simpler isotropic reconstruction.
-    '''
-
     # ----------
     #  Crop Subvolumes
     # ----------
-    coord_np,z_crop_num,y_crop_num,x_crop_num = create_coord(test_h5.shape, image_shape,overlap)
-    test_shape = test_h5.shape
-    vol_ls=[]
-    with torch.no_grad():
-        for i in tqdm(range(coord_np.shape[1]), desc='Running'):
-            z, y, x = coord_np[0, i], coord_np[1, i], coord_np[2, i]
-            crop = np.s_[z - image_shape[0]//2:z + image_shape[0]//2, y - image_shape[1]//2:y + image_shape[1]//2,
-                   x - image_shape[2]//2:x + image_shape[2]//2]
-            batch = test_h5[crop]
-            batch = torch.tensor(batch[np.newaxis, np.newaxis, ...] / 255.0).type(Tensor)
+    coord_np, y_crop_num, x_crop_num = create_coord_2d((image.shape[1],image.shape[2]), (args.test_shape[1], args.test_shape[2]), args.test_overlap)
 
-            # ----------
-            #  Inference on Subvolumes
-            # ----------
-            if tta:# test-time augmentation by 8 rotations
-                batch_rot_ls = rotate_8(batch)
-                pred_rot_ls = []
-
-                for j in range(0, len(batch_rot_ls)): # for each rotated subvolume
-                    batch_rot = batch_rot_ls[j]
-                    if debris: # if true, change processing axis
-                        batch_rot = batch_rot.permute(0, 1, 3, 2, 4)
-
-                    # model inference
-                    batch_rot=batch_rot.squeeze().permute(1, 0, 2).unsqueeze(1).unsqueeze(0)
-                    assert(scale_factor==1 if debris else True)
-                    pred_rot = model(x=batch_rot,current_scale=scale_factor)
-                    pred_rot =pred_rot.squeeze().permute(1,0,2).unsqueeze(0).unsqueeze(0)
-
-                    if debris: # if true, change processing axis
-                        pred_rot = pred_rot.permute(0, 1, 3, 2, 4)
-                    pred_rot_ls.append(pred_rot)
-                image_shape_=(pred_rot.shape[2],pred_rot.shape[3],pred_rot.shape[4])
-
-                if uncertainty:# visualize model uncertainty map
-                    pred_ls,_=anti_rotate_8(pred_rot_ls, image_shape_)
-                    pred_ls=[item.squeeze().cpu().detach().numpy() for item in pred_ls]
-                    pred=np.std(np.array(pred_ls),axis=0)
-                else:# visualize isotropic reconstruction results
-                    _, pred = anti_rotate_8(pred_rot_ls, image_shape_)
-                    pred = pred.squeeze().cpu().detach().numpy()
-
-            else:# no TTA
+    pred_inpaint_ls = []
+    # for each slice
+    for idx in idx_ls:
+        vol_ls = []
+        # ----------
+        #  Model Inference
+        # ----------
+        with torch.no_grad():
+            # for each region
+            for i in tqdm(range(coord_np.shape[1]), desc='Inpaint slice '+str(idx)):
+                y, x = coord_np[0, i], coord_np[1, i]
+                crop = np.s_[idx - args.test_shape[0] // 2:idx + args.test_shape[0] // 2, y - args.test_shape[1] // 2:y + args.test_shape[1] // 2,
+                       x - args.test_shape[2] // 2:x + args.test_shape[2] // 2]
+                batch = image[crop]
                 # model inference
-                batch = batch.squeeze().permute(1, 0, 2).unsqueeze(1).unsqueeze(0)
-                pred = model(x=batch,current_scale=scale_factor)
-                pred=pred.squeeze().permute(1,0,2).cpu().detach().numpy()
-            vol_ls.append(pred)
-
+                batch = torch.tensor(batch / 255.0).type(Tensor).unsqueeze(1).unsqueeze(0)
+                pred = model(x=batch,current_scale=1)
+                pred=pred.squeeze().cpu().detach().numpy()
+                # save inpainted region
+                vol_ls.append(pred[args.test_shape[0] // 2])
         # ----------
-        #  Free Memory
+        #  2D Stitch
         # ----------
-        if tta:
-            del pred_rot
-            del batch_rot
-            del pred_rot_ls
-            del batch_rot_ls
-        del pred
-        del batch
-        del model
-        del test_h5
-        torch.cuda.empty_cache()
+        print("Stitching takes some time...")
+        stitch_vol=stitch2D(vol_ls, (image.shape[1],image.shape[2]), (args.test_shape[1], args.test_shape[2]), args.test_overlap)
+        pred_inpaint_ls.append(float2uint8(stitch_vol))
 
-    # ----------
-    #  Save Intermediate Results
-    # ----------
-    # vol_np=np.array(vol_ls)
-    # np.save(os.path.join(save_dir,'pred.npy'),vol_np)
-    # del vol_np
-    # vol_np=np.load(os.path.join(save_dir,'pred.npy'))
-    # vol_ls=vol_np.tolist()
-
-    # ----------
-    #  3D Stitch
-    # ----------
-    # 3d stitch along x axis
-    x_ls=[]
-    for i in range(z_crop_num):
-        for j in range(y_crop_num):
-            x_temp = None
-            for k in range(x_crop_num):
-                nps=np.s_[i * y_crop_num * x_crop_num + j * x_crop_num + k]
-                if x_temp is not None:
-                    ovlp=overlap if x_temp.shape[2]+vol_ls[nps].shape[2]-overlap<=test_shape[2] \
-                        else x_temp.shape[2]+vol_ls[nps].shape[2]-test_shape[2]
-                    x_temp = blend3D_X(x_temp, vol_ls[nps],overlap=ovlp)
-                else:
-                    x_temp = vol_ls[nps]
-            x_ls.append(x_temp)
-    # 3d stitch along y axis
-    y_ls=[]
-    for i in range(z_crop_num):
-        y_temp = None
-        for j in range(y_crop_num):
-            nps =np.s_[i * y_crop_num + j]
-            if y_temp is not None:
-                ovlp = overlap if y_temp.shape[1] + x_ls[nps].shape[1] - overlap <= test_shape[1] \
-                    else y_temp.shape[1] + x_ls[nps].shape[1] - test_shape[1]
-                y_temp = blend3D_Y(y_temp, x_ls[nps],overlap=ovlp)
-            else:
-                y_temp = x_ls[nps]
-        y_ls.append(y_temp)
-    # 3d stitch along z axis
-    z_temp=None
-    for i in range(z_crop_num):
-        if z_temp is not None:
-            ovlp = int(overlap* scale_factor) if z_temp.shape[0] + y_ls[i].shape[0] - int(overlap* scale_factor) <= int(test_shape[0] * scale_factor) \
-                else z_temp.shape[0] + y_ls[i].shape[0] - int(test_shape[0] * scale_factor)
-            z_temp = blend3D_Z(z_temp, y_ls[i],overlap=ovlp)
-        else:
-            z_temp = y_ls[i]
-
-    # ----------
-    #  Return Final Results
-    # ----------
-    z_temp[z_temp < 0] = 0
-    z_temp[z_temp > 1] = 1
-    res=(z_temp* 255).astype('uint8')
-    return res
+    return pred_inpaint_ls
 
 
-if __name__ == '__main__':
+def run_model_isosr(model,image,scale_factor):
+    '''
+    model inference for isotropic reconstruction with uncertainty map.
+    :param model: pretrained isovem model
+    :param image: test data wait for processing
+    :param scale_factor: the scale factor of isotropic reconstruction.
+    '''
     # ----------
-    #  Configs
+    #  Crop Subvolumes
     # ----------
-    import configs
-    opt = configs.get_EPFL_configs()
-    print(opt)
+    coord_np,z_crop_num,y_crop_num,x_crop_num = create_coord_3d(image.shape, args.test_shape, args.test_overlap)
 
-    # ----------
-    #  Preparing
-    # ----------
-    from dataset import *
-    from metric import *
-    from utils import *
-
-    # device
-    cuda = torch.cuda.is_available()
-    Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
-
-    # save path
-    save_dir = os.path.join(opt.test_dir,opt.test_model.split('/')[-2]+'_'+opt.test_model.split('/')[-1].split('.')[0])
-    os.makedirs(save_dir, exist_ok=True)
-    pred_name=os.path.join(save_dir,'pred.tif')
-    print(pred_name)
-
-    # ----------
-    #  Load data
-    # ----------
-    tic = time.time()
-    input_h5 = io.imread(opt.test_h5)
-
+    vol_pred_ls=[]
+    vol_uncertainty_ls = []
     # ----------
     #  Model Inference
     # ----------
-    model = torch.load(opt.test_model).eval()
-    pred_h5 = run_model(model, input_h5, opt.test_upscale, opt.test_shape, opt.test_overlap,
-                        tta=opt.test_tta, uncertainty=opt.test_uncertainty,debris=opt.test_debris)
+    with torch.no_grad():
+        # for each subvolume
+        for i in tqdm(range(coord_np.shape[1]), desc='IsoSR'):
+            z, y, x = coord_np[0, i], coord_np[1, i], coord_np[2, i]
+            crop = np.s_[z - args.test_shape[0] // 2:z + args.test_shape[0] // 2, y - args.test_shape[1] // 2:y + args.test_shape[1] // 2,
+                   x - args.test_shape[2] // 2:x + args.test_shape[2] // 2]
+            batch = image[crop]
+            # eight rotations
+            batch = torch.tensor(batch[np.newaxis, np.newaxis, ...] / 255.0).type(Tensor)
+            batch_rot_ls = rotate_8(batch)
+            pred_rot_ls = []
+            # for each rotated subvolume
+            for j in range(0, len(batch_rot_ls)):
+                batch_rot = batch_rot_ls[j]
+                # model inference
+                batch_rot=batch_rot.squeeze().permute(1, 0, 2).unsqueeze(1).unsqueeze(0)
+                pred_rot = model(x=batch_rot,current_scale=scale_factor)
+                pred_rot =pred_rot.squeeze().permute(1, 0, 2).unsqueeze(0).unsqueeze(0)
+                pred_rot_ls.append(pred_rot)
+            # save isosr
+            pred_ls, pred = inv_rotate_8(pred_rot_ls, (pred_rot.shape[2], pred_rot.shape[3], pred_rot.shape[4]))
+            pred_ls = [item.squeeze().cpu().detach().numpy() for item in pred_ls]
+            uncertainty = np.std(np.array(pred_ls), axis=0)
+            pred = pred.squeeze().cpu().detach().numpy()
+
+            vol_pred_ls.append(pred)
+            vol_uncertainty_ls.append(uncertainty)
 
     # ----------
-    #  Save results
+    #  Free Memory
     # ----------
-    io.imsave(pred_name,pred_h5)
-    tac = time.time()
-    print("Testing costs{:.2f} min".format((tac - tic) / 60))
+    del pred_rot
+    del batch_rot
+    del pred_rot_ls
+    del batch_rot_ls
+    del pred
+    del batch
+    torch.cuda.empty_cache()
 
     # ----------
-    #  If gt exists, perform metric evaluation.
+    #  3D stitch
     # ----------
-    if opt.test_gt:
-        import time
-        print('Start:', time.strftime('%Y-%m-%d %H:%M:%S'))
-        tic = time.time()
+    print("Stitching takes some time...")
+    stitch_isosr = stitch3D(vol_pred_ls, image.shape, args.test_shape, args.test_overlap, args.test_upscale)
+    stitch_isosr_map = stitch3D(vol_uncertainty_ls, image.shape, args.test_shape, args.test_overlap, args.test_upscale)
+    return float2uint8(stitch_isosr),float2uint8(stitch_isosr_map)
 
-        test_h5 = io.imread(opt.test_gt)
-        pred_h5 = io.imread(pred_name)
-        assert (pred_h5.shape == test_h5.shape)
-        calculate_metrics(pred_h5, test_h5, save_json=pred_name+"_metric.json", is_cuda=False)
+def test_func(args, stdout=None):
+    if stdout is not None:
+        save_stdout = sys.stdout
+        save_stderr = sys.stderr
+        sys.stdout = stdout
+        sys.stderr = stdout
 
-        tac = time.time()
-        print('End:', time.strftime('%Y-%m-%d %H:%M:%S'))
-        print("Testing costs{:.2f} min".format((tac - tic) / 60))
+    print("===> Preparing environment")
+    torch.cuda.set_device(int(args.test_gpu_ids))
+    os.makedirs(args.test_output_dir, exist_ok=True)
+    cuda = torch.cuda.is_available()
+    Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
+
+    # ----------
+    #  Load data and model
+    # ----------
+    if args.test_data_pth.split('.')[-1] == 'tif':
+        image_file = io.imread(args.test_data_pth)
+    elif args.test_data_pth.split('.')[-1] == 'h5':
+        image_file = np.array(h5py.File(args.test_data_pth, 'r')['raw'])
+    else:
+        raise ValueError(f'Not support the image format of {args.test_data_pth}')
+
+    device=torch.device("cuda")
+    model = torch.load(args.test_ckpt_path,map_location=device).eval()
+
+    # ----------
+    #  Generate hyperparams
+    # ----------
+    if args.test_upscale == 8:
+        args.test_shape = (16, 128, 128)
+        args.test_overlap = 8
+    elif args.test_upscale == 10:
+        args.test_shape = (16, 160, 160)
+        args.test_overlap = 8
+    else:
+        raise ValueError(f'Not support the upscale factor {args.train_upscale}')
+
+    # ----------
+    #  Model Inference for slice inpainting
+    # ----------
+    if args.test_inpaint:
+        pred_inpaint_ls = run_model_inpaint(model, image_file, args.test_inpaint_index, args)
+        for i, idx in enumerate(args.test_inpaint_index):
+            image_file[idx] = pred_inpaint_ls[i]
+        io.imsave(os.path.join(args.test_output_dir, 'inpaint.tif'), image_file)
+        print('Inpainted input volume is saved to {}, named {}'.format(args.test_output_dir, 'inpaint.tif'))
+
+    # ----------
+    #  Model Inference for isotropic reconstruction with uncertainty map
+    # ----------
+    pred_isosr, pred_isosr_map = run_model_isosr(model, image_file, args.test_upscale)
+    io.imsave(os.path.join(args.test_output_dir, 'isosr.tif'), pred_isosr)
+    print('Isotropic reconstructed volume is saved to {}, named {}'.format(args.test_output_dir, 'isosr.tif'))
+    io.imsave(os.path.join(args.test_output_dir, 'isosr_map.tif'), pred_isosr_map)
+    print('Uncertainty map of reconstruction is saved to {}, named {}'.format(args.test_output_dir, 'isosr_map.tif'))
+
+    print('*' * 100)
+    if stdout is not None:
+        sys.stdout = save_stdout
+        sys.stderr = save_stderr
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Parameters for IsoVEM Testing')
+    parser.add_argument('--test_config_path', help='path of test config file', type=str,
+                        default="configs/demo_test.json")
+
+    with open(parser.parse_args().test_config_path, 'r', encoding='UTF-8') as f:
+        test_config = json.load(f)
+    add_dict_to_argparser(parser, test_config)
+    args = parser.parse_args()
+    print(args)
+
+    test_func(args)
+

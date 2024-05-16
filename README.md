@@ -1,4 +1,4 @@
-# IsoVEM: Video Transformer Enables Accurate and Robust Isotropic Reconstruction for Volume Electron Microscopy
+# **IsoVEM: Accurate and Robust Isotropic Reconstruction for Volume Electron Microscopy Using a Video Transformer**
 
 This repository `IsoVEM` is the official implementation of the bioRxiv paper(https://www.biorxiv.org/content/10.1101/2023.11.22.567807v3).
 
@@ -8,89 +8,52 @@ This repository `IsoVEM` is the official implementation of the bioRxiv paper(htt
 
 Here's a summary of the key dependencies.
 
-- python 3.7
+- python 3.8.3
 - pytorch 1.8.1
 - CUDA 11.1
 
 We recommend the following demand to install all of the dependencies.
 
 ```
-conda create -n isovem
+conda create -n isovem -c conda-forge python=3.8.3 -y
 conda activate isovem
-pip install -r requirements.txt
+pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 pytorch_msssim==1.0.0 -f https://download.pytorch.org/whl/torch_stable.html
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 ```
 
 The typical install time for these packages is within 1 hour.
 
-#### 2.Configuration
+- **if using GUI**
+	
+	To use GUI packages with Linux, you will need to install the following extended dependencies for Qt. 
+	1. For `CentOS`, to install packages, please do:
+		```bash
+		sudo yum install -y mesa-libGL libXext libSM libXrender fontconfig xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil libxkbcommon-x11
+		```
 
-The predefined config files are provided in`configs/epfl.py` or  `configs/cremi.py`. The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
+	2. For `Ubuntu`, to install packages, please do:
+		```bash
+		sudo apt update
+		sudo apt-get install -y libgl1-mesa-glx libglib2.0-dev libsm6 libxrender1 libfontconfig1 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-dev libdbus-1-3
+		```
 
-```
-# experiment
-config.exp_name="epfl-8" # experiment name
-config.upscale=8 # scale factor during training
-config.inpaint=False # if True, perform IsoVEM+ training
+#### 2.Model Training
 
-# running
-config.gpu_ids="6" # gpu device
-os.environ['CUDA_VISIBLE_DEVICES'] = config.gpu_ids
-config.n_cpu = 0
-
-# tblogger
-config.use_tb_logger=True
-config.tblogger="tblogger/"+config.exp_name # tensorboard logger path
-
-# datasets
-config.train_h5 = "data/epfl/train_gt.tif" # training data path
-config.val_h5 = "data/epfl/val_gt.tif" # validation data path
-config.train_shape = (128,128,128) # training subvolume size
-config.val_shape = (128,128,128) # validation subvolume size
-config.train_gt = True # whether train_h5 is an isotropic data
-config.val_gt = True # whether val_h5 is an isotropic data
-
-# paths
-config.ckpt_dir= "ckpt" # saving path for model checkpoints
-config.valid_dir="valid" # saving path for visualizations during validation
-config.pretrain_model=None # pretrained model path. if None, training from scratch.
-
-# model
-config.img_size=[16,16,128] # video sequence size
-config.window_size=[2,2,16] # window attention
-config.depths=[4,4,4,4,4,4,4, 2,2,2,2, 2,2] # number of TMSA in TRSA
-config.indep_reconsts=[11,12] # per-frame window attention in the end
-config.embed_dims=[40,40,40,40,40,40,40, 60,60,60,60, 60,60] # feature channels
-config.num_heads=[4,4,4,4,4,4,4, 4,4,4,4, 4,4] # number of heads for window attention
-
-# train
-config.start_epoch=1  # starting training epoch
-config.end_epoch=200 # ending training epoch
-config.ckpt_interval=1 # epoch interval for saving checkpoints
-config.batch_size=2 # batch size
-config.lr=1e-3 # learning rate
-config.b1=0.9  # adam optimizer params
-config.b2=0.999 # adam optimizer params
-
-# test
-config.test_h5 = "data/epfl/test_8.tif" # test anisotropic data path
-config.test_model = "ckpt/epfl-8/model_epoch_1.pth" # model checkpoint for testing
-config.test_dir = "test" # saving path for testing results
-config.test_shape = (16, 128, 128) # subvolume size
-config.test_overlap = 8 # overlapped voxels for subvolume stitching
-config.test_upscale = 8 # scale factor during inference, it can be different from training phase
-config.test_tta = True # if true, perform test time augmentation based on 8 orthogonal rotations
-config.test_uncertainty = False # if true, get model uncertainty map rather than isotropic reconstruction results. need to set test_tta=True.
-config.test_debris=False # if true, perform slice inpainting, need to set test_upscale=1. if false, perform isotropic reconstruction
-config.test_gt="data/epfl/test_gt.tif" # test isotropic data path for metrics calculation
-```
-
-#### 3.Model Training/Testing
-
-After define the configuration file, the training and testing can be performed on  train.py  and test.py, only change configure importation.
+The predefined config files are provided in`configs/train.py` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
 
 ```
-import configs
-opt = configs.get_EPFL_configs()
+config.train_data_pth="data/demo.tif" # str, input anisotropic data path. tif or h5 is supported. default "data/demo.tif"
+config.train_output_dir="train" # str, output work dir, including /ckpt, /tblogger, /visuals, etc. default "train".
+config.train_data_split=0.7 # float from 0-1, the percent of training data in the input data. default 0.7.
+config.train_upscale=8 # int, scale factor during training, supporting 8 and 10 now. default 8.
+config.train_inpaint=False # bool, whether learning slice inpainting jointly, default False.
+config.train_epoch=200 # int, number of training epoch, default 200.
+config.train_bs=2 # int, batch size for training, default 2.
+config.train_lr=1e-3 # float, learning rate for training, default 1e-3.
+config.train_ckpt_interval=1 # int, epoch interval for saving checkpoints, default 1.
+config.train_is_resume=False # bool, whether training model from a pretrained checkpoint. defaule False.
+config.train_resume_ckpt_path= None # str, training model from resume checkpoint. default None.
+config.train_gpu_ids="0" # str, ids of available gpu card. supporting single card only now. default "0".
 ```
 
 Run the training code as follows. The typical training time for demo data costs several hours. 
@@ -99,31 +62,29 @@ Run the training code as follows. The typical training time for demo data costs 
 python train.py 
 ```
 
-Run the testing code as follows. The typical testing time for demo data costs 20 mins.
+#### 3.Model Testing
+
+The predefined config files are provided in`configs/test.py` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
+
+```
+config.test_data_pth = "/mnt/data1/EMData/Demo/data/demo.tif"  # str, input anisotropic data path.
+config.test_ckpt_path = "/mnt/data1/EMData/Demo/train/checkpoint/model_epoch_2.pth"  # str, pretrained model path for testing.
+config.test_output_dir = "/mnt/data1/EMData/Demo/test"  # str, output work dir, including /result, etc.
+config.test_upscale = 8  # int, scale factor during testing (it can be different from training phase), default 8.
+config.test_inpaint = True  # bool, whether perform inpainting during testing. It takes around double inference time.
+config.test_inpaint_index = [20,40]  # list, the list of slice index (start from 0) along Z-axis to be inpainted. If no need for inpainting, set []. default [].
+config.test_gpu_ids="0" # str, ids of available gpu card. supporting single card only now. default "0".
+```
+
+Run the testing code as follows. The typical testing time for demo data costs about 20 mins.
 
 ```
 python test.py 
 ```
 
-#### 4.Attention Visualization
+#### 4.Image Visualization
 
-Visualizing the attention module in IsoVEM helps to better understand model's behavior. The tool [Visualizer](https://github.com/luo3300612/Visualizer) needs to be installed as its instruction to generate the attention map of intermediate layer of isoVEM. 
-
-The interested layer and attention window can be defined customly.
-
-```
-roi = np.s_[70:70 + 64, 56:56 + 16, 1138:1138 + 256] # roi of input volume, such as region containing bilayer
-idx_depth=3 # idx range: the length of config.depths list. choose self-attention-only and no-downsample layer in TMSAG
-window_size = [4,8,32] # window size for visualization
-idx_window=167 # idx range: img_size=[16,64,256]//window_size=[4,8,32]=256
-idx_query=84 # idx range: window_size=[4,8,32], 8*32=256
-```
-
-After installing the [Visualizer](https://github.com/luo3300612/Visualizer) tool, run the visualization code as follows.
-
-```
-python models/attmap.py 
-```
+The interface provides image visualization function. It is convenient to determine the slice index of the input data that needs inpaint, and you can view the reconstruction results immediately after the reconstruction is completed. The reconstruction results can be overlayed with uncertainty map.
 
 ## Acknowledgement
 

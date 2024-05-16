@@ -92,6 +92,7 @@ def compute_lpips(arr1, arr2, need_2d=True):
         lpips_ls.extend([lpips_xy.item(), lpips_xz.item(), lpips_yz.item()])
     return lpips_ls
 
+
 def error_map(arr1, arr2,save_dir):
     '''visualize the error map'''
     err=torch.abs(arr1-arr2)
@@ -127,3 +128,15 @@ def calculate_metrics(arr1,arr2,save_json=None,is_cuda=False,vis_error=False):
             f.write(json.dumps(metrics, ensure_ascii=False, indent=4, separators=(',', ':')))
 
     return metrics
+
+if __name__ == '__main__':
+    # ----------
+    #  If gt exists, perform metric evaluation.
+    # ----------
+    pred_pth="" # add your data path
+    gt_pth="" # add your data path
+
+    pred = io.imread(pred_pth)
+    gt = io.imread(gt_pth)
+    assert (pred.shape == gt.shape)
+    calculate_metrics(pred, gt, save_json="metric.json", is_cuda=False)

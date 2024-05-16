@@ -1,0 +1,14 @@
+{
+    "train_data_pth":"/mnt/data1/EMData/Demo/data/demo.tif",
+    "train_output_dir":"/mnt/data1/EMData/Demo/train",
+    "train_data_split":0.7,
+    "train_upscale":8,
+    "train_inpaint":false,
+    "train_epoch":200,
+    "train_bs":2,
+    "train_lr":1e-3,
+    "train_ckpt_interval":1,
+    "train_is_resume":false,
+    "train_resume_ckpt_path":null,
+    "train_gpu_ids":"0"
+}

@@ -6,16 +6,13 @@
 # LICENSE file in the root directory of this source tree.
 # https://github.com/JingyunLiang/VRT/blob/main/LICENSE
 
-import os
 import warnings
 import math
 import torch
 import torch.nn as nn
-import torchvision
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from distutils.version import LooseVersion
-from torch.nn.modules.utils import _pair, _single
 import numpy as np
 from functools import reduce, lru_cache
 from operator import mul
