@@ -1,6 +1,6 @@
 {
-    "train_data_pth":"/mnt/data1/EMData/Demo/data/demo.tif",
-    "train_output_dir":"/mnt/data1/EMData/Demo/train",
+    "train_data_pth":"data/demo.tif",
+    "train_output_dir":"train",
     "train_data_split":0.7,
     "train_upscale":8,
     "train_inpaint":false,

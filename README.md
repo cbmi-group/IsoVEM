@@ -21,7 +21,7 @@ pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 pytor
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 ```
 
-The typical install time for these packages is within 1 hour.
+The typical install time for these packages is within half hour.
 
 - **if using GUI**
 	
@@ -39,52 +39,70 @@ The typical install time for these packages is within 1 hour.
 
 #### 2.Model Training
 
-The predefined config files are provided in`configs/train.py` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
+The predefined config files are provided in`configs/demo_train.json` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
 
 ```
-config.train_data_pth="data/demo.tif" # str, input anisotropic data path. tif or h5 is supported. default "data/demo.tif"
-config.train_output_dir="train" # str, output work dir, including /ckpt, /tblogger, /visuals, etc. default "train".
-config.train_data_split=0.7 # float from 0-1, the percent of training data in the input data. default 0.7.
-config.train_upscale=8 # int, scale factor during training, supporting 8 and 10 now. default 8.
-config.train_inpaint=False # bool, whether learning slice inpainting jointly, default False.
-config.train_epoch=200 # int, number of training epoch, default 200.
-config.train_bs=2 # int, batch size for training, default 2.
-config.train_lr=1e-3 # float, learning rate for training, default 1e-3.
-config.train_ckpt_interval=1 # int, epoch interval for saving checkpoints, default 1.
-config.train_is_resume=False # bool, whether training model from a pretrained checkpoint. defaule False.
-config.train_resume_ckpt_path= None # str, training model from resume checkpoint. default None.
-config.train_gpu_ids="0" # str, ids of available gpu card. supporting single card only now. default "0".
+"train_data_pth":"data/demo.tif" # str, input anisotropic data path. tif or h5 is supported.default "data/demo.tif".
+"train_output_dir":"train" # str, output work dir, including /ckpt, /tblogger, /visuals, etc. default "train".
+"train_data_split":0.7 # float from 0-1, the percent of training data in the input data. default 0.7.
+"train_upscale":8 # int, scale factor during training, supporting 8 and 10 now. default 8.
+"train_inpaint":false # bool, whether model learning slice inpainting jointly, default False.
+"train_epoch":200 # int, number of training epoch, default 200.
+"train_bs":2 # int, batch size for training, default 2.
+"train_lr":1e-3 # float, learning rate for training, default 1e-3.
+"train_ckpt_interval":1 # int, epoch interval for saving checkpoints, default 1.
+"train_is_resume":false # bool, whether training model from a pretrained checkpoint. defaule False.
+"train_resume_ckpt_path":null # str, training model from resume checkpoint. default null.
+"train_gpu_ids":"0" # str, ids of available gpu card. supporting single card now. default "0".
 ```
 
-Run the training code as follows. The typical training time for demo data costs several hours. 
+Model training supports two methods, one is command line and the other is GUI.
+
+(1) Command line:   
 
 ```
-python train.py 
+python train.py --train_config_path configs/demo_train.json
 ```
+
+(2) GUI:
+
+![GUI_Training](markdown\GUI_Training.png)
+
+The typical training time for demo data costs several hours.
 
 #### 3.Model Testing
 
-The predefined config files are provided in`configs/test.py` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
+The predefined config files are provided in`configs/demo_test.json` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
 
 ```
-config.test_data_pth = "/mnt/data1/EMData/Demo/data/demo.tif"  # str, input anisotropic data path.
-config.test_ckpt_path = "/mnt/data1/EMData/Demo/train/checkpoint/model_epoch_2.pth"  # str, pretrained model path for testing.
-config.test_output_dir = "/mnt/data1/EMData/Demo/test"  # str, output work dir, including /result, etc.
-config.test_upscale = 8  # int, scale factor during testing (it can be different from training phase), default 8.
-config.test_inpaint = True  # bool, whether perform inpainting during testing. It takes around double inference time.
-config.test_inpaint_index = [20,40]  # list, the list of slice index (start from 0) along Z-axis to be inpainted. If no need for inpainting, set []. default [].
-config.test_gpu_ids="0" # str, ids of available gpu card. supporting single card only now. default "0".
+"test_data_pth": "data/demo.tif"  # str, input anisotropic data path.
+"test_ckpt_path": "train/checkpoint/model_epoch_1.pth"  # str, pretrained model path for testing.
+"test_output_dir": "test" # str, output work dir, including /result, etc.
+"test_upscale": 8  # int, scale factor during testing (it can be different from training phase), default 8.
+"test_inpaint": true  # bool, whether perform inpainting during testing.
+"test_inpaint_index":  [20,40] # list, the list of slice index (start from 0) along Z-axis to be inpainted. If no need for inpainting, set []. default [].
+"test_gpu_ids": "0" # str, ids of available gpu card. supporting single card now. default "0".
 ```
 
-Run the testing code as follows. The typical testing time for demo data costs about 20 mins.
+Model testing supports two methods, one is command line and the other is GUI.
+
+(1) Command line: 
 
 ```
-python test.py 
+python test.py --test_config_path configs/demo_test.json
 ```
+
+(2) GUI:
+
+![GUI_Predicting](markdown\GUI_Predicting.png)
+
+The typical testing time for demo data costs within 1 hour.
 
 #### 4.Image Visualization
 
-The interface provides image visualization function. It is convenient to determine the slice index of the input data that needs inpaint, and you can view the reconstruction results immediately after the reconstruction is completed. The reconstruction results can be overlayed with uncertainty map.
+The GUI provides image visualization function. It is convenient to determine the slice index of the input data that needs inpaint, and you can view the reconstruction results immediately after the reconstruction is completed. The reconstruction results can be overlayed with uncertainty map.
+
+![GUI_Visualization](markdown\GUI_Visualization.png)
 
 ## Acknowledgement
 

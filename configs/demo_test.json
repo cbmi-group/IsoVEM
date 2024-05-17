@@ -1,7 +1,7 @@
 {
-    "test_data_pth":"/mnt/data1/EMData/Demo/data/demo.tif",
-    "test_ckpt_path":"/mnt/data1/EMData/Demo/train/checkpoint/model_epoch_2.pth",
-    "test_output_dir": "/mnt/data1/EMData/Demo/test",
+    "test_data_pth":"data/demo.tif",
+    "test_ckpt_path":"train/checkpoint/model_epoch_1.pth",
+    "test_output_dir": "test",
     "test_upscale":  8,
     "test_inpaint": true,
     "test_inpaint_index": [20,40],
