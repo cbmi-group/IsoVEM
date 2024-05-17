@@ -66,7 +66,7 @@ python train.py --train_config_path configs/demo_train.json
 
 (2) GUI:
 
-![GUI_Training](markdown\GUI_Training.png)
+![GUI_Training](markdown/GUI_Training.png)
 
 The typical training time for demo data costs several hours.
 
@@ -94,7 +94,7 @@ python test.py --test_config_path configs/demo_test.json
 
 (2) GUI:
 
-![GUI_Predicting](markdown\GUI_Predicting.png)
+![GUI_Predicting](markdown/GUI_Predicting.png)
 
 The typical testing time for demo data costs within 1 hour.
 
@@ -102,7 +102,7 @@ The typical testing time for demo data costs within 1 hour.
 
 The GUI provides image visualization function. It is convenient to determine the slice index of the input data that needs inpaint, and you can view the reconstruction results immediately after the reconstruction is completed. The reconstruction results can be overlayed with uncertainty map.
 
-![GUI_Visualization](markdown\GUI_Visualization.png)
+![GUI_Visualization](markdown/GUI_Visualization.png)
 
 ## Acknowledgement
 
