@@ -37,27 +37,15 @@ def rescale(arr):
     arr_max = arr.max()
     return (arr - arr_min) / (arr_max - arr_min)
 
-def add_transparency(img, label, factor, color, thresh):
+def add_transparency(img, label, alpha):
     img = np.array(255.0 * rescale(img), dtype=np.uint8)
+    label = (label / label.max() * 255).astype('uint8')
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    label_rgb = cv2.cvtColor(label, cv2.COLOR_GRAY2BGR)
 
-    alpha_channel = np.ones(img.shape, dtype=img.dtype) * 255
-
-    img_BGRA = cv2.merge((img, img, img, alpha_channel))
-
-    img = img[:, :, np.newaxis]
-    img1 = img.repeat([3], axis=2)
-    img1[label.astype(int) == 1] = (255, 0, 0)
-    img1[label.astype(int) == 2] = (0, 255, 0)
-    img1[label.astype(int) == 3] = (0, 0, 255)
-    img1[label.astype(int) == 4] = (0, 255, 255)
-    # img1[label > factor] = color
-    c_b, c_g, c_r = cv2.split(img1)
-    mask = np.where(label > factor, 1, 0)
-    img1_alpha = np.array(mask * 255 * factor, dtype=np.uint8)
-    img1_alpha[img1_alpha == 0] = 255
-    img1_BGRA = cv2.merge((c_b, c_g, c_r, img1_alpha))
-
-    out = cv2.addWeighted(img_BGRA, 1 - factor, img1_BGRA, factor, 0)
+    label_rgb[:, :, 2] = 0
+    label_rgb[:, :, 1] = 0
+    out = cv2.addWeighted(img_rgb, 1, label_rgb, alpha, 0)
 
     return np.array(out)
 

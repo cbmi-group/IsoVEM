@@ -1,10 +1,11 @@
+import PyQt5.uic.Compiler.qobjectcreator
 from PyQt5.QtWidgets import QApplication, QFileDialog, \
-    QMessageBox, QHBoxLayout
-from PyQt5 import QtWidgets
+    QMessageBox, QHBoxLayout, QGraphicsScene, QVBoxLayout, QLabel
+from PyQt5 import QtWidgets, QtGui
+from PyQt5.QtCore import QTimer
 import MainWindow
 import json
 import pyqtgraph as pg
-from utils import *
 import os
 import threading
 import argparse
@@ -12,9 +13,10 @@ from train import train_func
 from test import test_func
 from skimage import io
 import h5py
+import numpy as np
+from utils import *
 
 class Stats(QtWidgets.QMainWindow):
-
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = MainWindow.Ui_isoVEM()
@@ -58,6 +60,19 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.train_pBut_loadConfigs.clicked.connect(self.train_loadConfigs)
         self.ui.train_pBut_ok.clicked.connect(self.train_ok)
         self.ui.train_pBut_stop.clicked.connect(self.train_stop)
+        if not self.ui.ckb_showLoss.isChecked():
+            self.ui.widget_show_loss.setVisible(False)
+        self.ui.ckb_showLoss.stateChanged.connect(self.train_show_loss_stateChanged)
+        layout = QVBoxLayout()
+        self.loss_win = pg.GraphicsLayoutWidget(show=True, title="Basic plotting examples")
+        self.loss_win.resize(1000, 600)
+        self.loss_win.setWindowTitle('pyqtgraph example: Plotting')
+        # Enable antialiasing for prettier plots
+        pg.setConfigOptions(antialias=True)
+        self.loss_p = self.loss_win.addPlot(title="Updating plot")
+        self.loss_curve = self.loss_p.plot(pen='r')
+        layout.addWidget(self.loss_win)
+        self.ui.widget_show_loss.setLayout(layout)
 
         # Testing
         self.test_configName = self.ui.test_edit_config_name.text()
@@ -68,8 +83,11 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.test_edit_output_path.textChanged.connect(self.test_edit_output_path_change)
         self.ui.pBut_add_test_ckpt_path.clicked.connect(self.test_load_weightPath)
         self.ui.edit_test_ckpt_path.textChanged.connect(self.test_ckpt_path_change)
-        self.ui.pBut_add_train_config_path.clicked.connect(self.test_loadTrainConfigs)
-        self.ui.test_edit_train_config_path.textChanged.connect(self.test_TrainConfig_change)
+        # self.ui.pBut_add_train_config_path.clicked.connect(self.test_loadTrainConfigs)
+        # self.ui.test_edit_train_config_path.textChanged.connect(self.test_TrainConfig_change)
+        self.ui.pBut_add_train_config_path.setVisible(False)
+        self.ui.test_edit_train_config_path.setVisible(False)
+        self.ui.label_12.setVisible(False)
         self.test_upscale_factor = self.ui.test_sb_upscale.value()
         self.ui.test_sb_upscale.valueChanged.connect(self.test_upscale_change)
         self.ui.test_edit_gpuIds.textChanged.connect(self.test_gpuIds_change)
@@ -235,7 +253,7 @@ class Stats(QtWidgets.QMainWindow):
                 train_resume_ckpt_path=self.train_resume_weightPath if isinstance(self.train_resume_weightPath, str) else self.train_resume_weightPath[0],
                 train_gpu_ids=self.train_gpuIds if isinstance(self.train_gpuIds, str) else self.train_gpuIds[0],
             )
-            config_save_path = './configs'
+            config_save_path = 'configs'
             # config_save_path = os.path.join(train_output_dir, 'configs')
             os.makedirs(config_save_path, exist_ok=True)
             self.train_config_save_path = f"{config_save_path}/{self.train_configName}.json"
@@ -355,13 +373,7 @@ class Stats(QtWidgets.QMainWindow):
 
     def train_stop(self):
         try:
-            # self.train_thread.n = 0
-            # self.train_thread.join()
-            # os.system(f"kill -9 {self.train_thread.pid_num}")
             stop_thread(self.train_thread)
-            # self.train_t.pause()
-            # os.system(f"kill {self.train_pid}")
-            # self.train_thread.terminate()
         except:
             pass
         self.train_show_info('*' * 100)
@@ -420,6 +432,35 @@ class Stats(QtWidgets.QMainWindow):
             self.train_thread = threading.Thread(target=train_func, args=(args, self.train_emit))
             # self.train_thread = myThread(1, train, args, self.train_emit)
             self.train_thread.start()
+
+    def train_show_loss_stateChanged(self):
+        if self.ui.ckb_showLoss.isChecked():
+            self.train_loss_show = True
+            self.ui.widget_show_loss.setVisible(True)
+            self.loss_timer_start()
+            self.train_show_info(f"Training - loss showing: {self.train_resume}")
+        else:
+            self.train_loss_show = False
+            self.loss_timer_stop()
+            self.ui.widget_show_loss.setVisible(False)
+
+    def loss_timer_start(self):
+        self.timer = PyQt5.QtCore.QTimer()
+        self.timer.start(5000)
+        self.timer.timeout.connect(self.loss_update)
+
+    def loss_timer_stop(self):
+        self.timer.stop()
+
+    def loss_update(self):
+        if self.train_output_data_path != "" and \
+              os.path.isfile(os.path.join(self.train_output_data_path, 'loss_metric.csv')):
+            # 6列，0-train loss，1-train l1 loss, 2-train ssim loss, 3-全0无意义，4-validation ssim, 5-validation psnr
+            data = np.loadtxt(os.path.join(self.train_output_data_path, 'loss_metric.csv'), delimiter=',')
+            self.loss_curve.setData(data[:, 0])
+            self.loss_p.setLabel('left', "train loss")
+            self.loss_p.setLabel('bottom', "epoch")
+            self.loss_p.enableAutoRange('xy', True)
 
     """
     Predicting
@@ -498,35 +539,32 @@ class Stats(QtWidgets.QMainWindow):
         self.test_show_info(f"Predicting - inpaint_ids: {self.test_inpaint_ids}")
 
     def test_saveConfigs(self):
+        # or self.ui.test_edit_train_config_path.text() == "" \
         if self.ui.test_edit_config_name.text() == "" \
                 or self.ui.test_edit_data_path.text() == "" \
                 or self.ui.test_edit_output_path.text() == "" \
                 or self.ui.edit_test_ckpt_path.text() == "" \
-                or self.ui.test_edit_train_config_path.text() == "" \
                 or self.ui.test_sb_upscale.text() == "" \
                 or self.ui.test_edit_gpuIds.text() == "" \
                 or (self.ui.test_edit_inpaint_ids.text() == "" and self.ui.test_ckb_inpaint.isChecked()):
             QMessageBox.critical(self, 'Error', 'Incomplete information')
         else:
-            test_output_dir=self.test_output_data_path if isinstance(self.test_output_data_path, str) else self.test_output_data_path[0]
             self.test_configs = dict(
                 test_config_name=(self.test_configName if isinstance(self.test_configName, str) else self.test_configName[0]),
                 test_data_pth=self.test_input_data_path if isinstance(self.test_input_data_path, str) else self.test_input_data_path[0],
                 test_output_dir=self.test_output_data_path if isinstance(self.test_output_data_path, str) else self.test_output_data_path[0],
                 test_ckpt_path=self.test_weightPath if isinstance(self.test_weightPath, str) else self.test_weightPath[0],
-                train_config_path=self.test_Trainconfig_path if isinstance(self.test_Trainconfig_path, str) else self.test_Trainconfig_path[0],
+                # train_config_path=self.test_Trainconfig_path if isinstance(self.test_Trainconfig_path, str) else self.test_Trainconfig_path[0],
                 test_upscale=self.test_upscale_factor if isinstance(self.test_upscale_factor, int) else self.test_upscale_factor[0],
                 test_gpu_ids=self.test_gpuIds if isinstance(self.test_gpuIds, str) else self.test_gpuIds[0],
                 test_inpaint=True if self.ui.test_ckb_inpaint.isChecked() else False,
                 test_inpaint_index=self.test_inpaint_ids if isinstance(self.test_inpaint_ids, str) else self.test_inpaint_ids[0],
             )
-            config_save_path = './configs'
+            config_save_path = 'configs'
             os.makedirs(config_save_path, exist_ok=True)
             self.test_config_save_path = f"{config_save_path}/{self.test_configName}.json"
             with open(self.test_config_save_path, 'w') as f:
                 f.write(json.dumps(self.test_configs, indent=4))
-                # f.write("test_configs=")
-                # json.dump(self.test_configs, f, separators=(',\n'+' '*len('test_configs={'), ': '))
             self.test_show_info(f"save predicting configs to '{self.test_config_save_path}.json'")
 
     def test_loadConfigs(self):
@@ -544,7 +582,7 @@ class Stats(QtWidgets.QMainWindow):
         self.test_input_data_path = self.test_configs['test_data_pth']
         self.test_output_data_path = self.test_configs['test_output_dir']
         self.test_weightPath = self.test_configs['test_ckpt_path']
-        self.test_Trainconfig_path = self.test_configs['train_config_path']
+        # self.test_Trainconfig_path = self.test_configs['train_config_path']
         self.test_upscale_factor = self.test_configs['test_upscale']
         self.test_gpuIds = self.test_configs['test_gpu_ids']
         self.test_inpaint = True if self.test_configs['test_inpaint'] is True else False
@@ -554,7 +592,7 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.test_edit_data_path.setText(self.test_input_data_path)
         self.ui.test_edit_output_path.setText(self.test_output_data_path)
         self.ui.edit_test_ckpt_path.setText(self.test_weightPath)
-        self.ui.test_edit_train_config_path.setText(self.test_Trainconfig_path)
+        # self.ui.test_edit_train_config_path.setText(self.test_Trainconfig_path)
         self.ui.test_sb_upscale.setValue(self.test_upscale_factor)
         self.ui.test_edit_gpuIds.setText(self.test_gpuIds)
 
@@ -586,7 +624,7 @@ class Stats(QtWidgets.QMainWindow):
         self.test_input_data_path = self.test_configs['test_data_pth']
         self.test_output_data_path = self.test_configs['test_output_dir']
         self.test_weightPath = self.test_configs['test_ckpt_path']
-        self.test_Trainconfig_path = self.test_configs['train_config_path']
+        # self.test_Trainconfig_path = self.test_configs['train_config_path']
         self.test_upscale_factor = self.test_configs['test_upscale']
         self.test_gpuIds = self.test_configs['test_gpu_ids']
         self.test_inpaint = True if self.test_configs['test_inpaint'] is True else False
@@ -596,7 +634,7 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.test_edit_data_path.setText(self.test_input_data_path)
         self.ui.test_edit_output_path.setText(self.test_output_data_path)
         self.ui.edit_test_ckpt_path.setText(self.test_weightPath)
-        self.ui.test_edit_train_config_path.setText(self.test_Trainconfig_path)
+        # self.ui.test_edit_train_config_path.setText(self.test_Trainconfig_path)
         self.ui.test_sb_upscale.setValue(self.test_upscale_factor)
         self.ui.test_edit_gpuIds.setText(self.test_gpuIds)
 
@@ -626,11 +664,11 @@ class Stats(QtWidgets.QMainWindow):
     def test_ok(self):
         self.test_saveConfigs()
         self.test_loadConfigs_v1()
+        # or self.ui.test_edit_train_config_path.text() == "" \
         if self.ui.test_edit_config_name.text() == "" \
                 or self.ui.test_edit_data_path.text() == "" \
                 or self.ui.test_edit_output_path.text() == "" \
                 or self.ui.edit_test_ckpt_path.text() == "" \
-                or self.ui.test_edit_train_config_path.text() == "" \
                 or self.ui.test_sb_upscale.text() == "" \
                 or self.ui.test_edit_gpuIds.text() == "" \
                 or (self.ui.test_edit_inpaint_ids.text() == "" and self.ui.test_ckb_inpaint.isChecked()):
@@ -643,7 +681,7 @@ class Stats(QtWidgets.QMainWindow):
             self.train_show_info(f"Testing - config Name: {self.test_configName}")
             self.train_show_info(f"Testing - input data path: {self.test_input_data_path}")
             self.train_show_info(f"Testing - output data path: {self.test_output_data_path}")
-            self.train_show_info(f"Testing - train config path: {self.test_Trainconfig_path}")
+            # self.train_show_info(f"Testing - train config path: {self.test_Trainconfig_path}")
             self.train_show_info(f"Testing - upscale factor: {self.test_upscale_factor}")
             self.train_show_info(f"Testing - gpu ids: {self.test_gpuIds}")
             self.train_show_info(f"Testing - is_inpaint: {self.test_inpaint}")
@@ -696,7 +734,6 @@ class Stats(QtWidgets.QMainWindow):
         self.win.show()  ## show widget alone in its own window
         self.win.setWindowTitle('pyqtgraph example: ImageItem')
         self.win.resize(x_max + z_max, y_max + z_max)
-        # win.ci.setBorder((5, 5, 10))
 
         self.win.nextRow()
         self.sub1 = self.win.addLayout(border=(100, 10, 10))
@@ -707,12 +744,10 @@ class Stats(QtWidgets.QMainWindow):
         self.p_xy.setAspectLocked(True)  ## lock the aspect ratio so pixels are always square
         self.p_xy.setXRange(0, x_max)
         self.p_xy.setYRange(0, y_max)
-        # self.p_xy.setLimits(xMin=-50, xMax=x_max+50, yMin=-50, yMax=y_max+50)
         self.img_xy = pg.ImageItem(border='b')
         self.p_xy.addItem(self.img_xy)
         self.img_xy.setImage(self.data_xy)
 
-        # self.p_zy = self.sub1.addViewBox(row=0, col=x_max, rowspan=1, colspan=1)
         self.p_zy = self.sub1.addViewBox()
         self.p_zy.disableAutoRange()
         self.p_zy.setAspectLocked(True)  ## lock the aspect ratio so pixels are always square
@@ -724,7 +759,6 @@ class Stats(QtWidgets.QMainWindow):
         self.p_zy.linkView(self.p_xy.YAxis, self.p_xy)
 
         self.sub1.nextRow()
-        # self.p_xz = self.sub1.addViewBox(row=y_max, col=0, rowspan=z_max, colspan=z_max)
         self.p_xz = self.sub1.addViewBox()
         self.p_xz.disableAutoRange()
         self.p_xz.setAspectLocked(True)  ## lock the aspect ratio so pixels are always square
@@ -734,12 +768,10 @@ class Stats(QtWidgets.QMainWindow):
         self.p_xz.addItem(self.img_xz)
         self.img_xz.setImage(self.data_xz)
         self.p_xz.linkView(self.p_xy.XAxis, self.p_xy)
-        # print(xz_h, xz_w)
 
         self.text = pg.LabelItem(justify='center')
         self.sub1.addItem(self.text)
         self.text.setText(f"({z_max // 2}, {y_max // 2}, {x_max // 2})")
-        # self.setSliderXYZ(z_max // 2, y_max // 2, x_max // 2, self.tomo_data.shape)
 
         # cross hair
         self.vLine_xy = pg.InfiniteLine(angle=90, movable=False)
@@ -784,12 +816,11 @@ class Stats(QtWidgets.QMainWindow):
 
         if self.flag_show_uncert:
             self.text.setText(f"({self.x:.0f}, {self.y:.0f}, {self.z:.0f}), "
-                              f"{self.tomo_data[int(self.z), int(self.y), int(self.x)]:.2f},"
-                              f"{self.uncert_data[int(self.z), int(self.y), int(self.x)]:.2f}")
+                              f"{self.tomo_data[int(self.z), int(self.y), int(self.x)]:.0f},"
+                              f"({self.uncert_data[int(self.z), int(self.y), int(self.x)]:.0f})")
         else:
             self.text.setText(f"({self.x:.0f}, {self.y:.0f}, {self.z:.0f}), "
-                          f"{self.tomo_data[int(self.z), int(self.y), int(self.x)]:.2f}")
-        # self.setSliderXYZ(self.z, self.y, self.x, self.tomo_data.shape)
+                          f"{self.tomo_data[int(self.z), int(self.y), int(self.x)]:.0f}")
         self.data_xy = np.transpose(self.tomo_data[int(self.z), :, :])
         self.data_zy = self.tomo_data[:, :, int(self.x)]
         self.data_xz = np.transpose(self.tomo_data[:, int(self.y), :])
@@ -802,11 +833,11 @@ class Stats(QtWidgets.QMainWindow):
                 self.label_xz = np.transpose(self.uncert_data[:, int(self.y), :])
 
                 self.img_xy.setImage(
-                    add_transparency(self.data_xy, self.label_xy, float(self.uncert_alpha) / 100., self.color, 0.5))
+                    add_transparency(self.data_xy, self.label_xy, float(self.uncert_alpha) / 100.))
                 self.img_zy.setImage(
-                    add_transparency(self.data_zy, self.label_zy, float(self.uncert_alpha) / 100., self.color, 0.5))
+                    add_transparency(self.data_zy, self.label_zy, float(self.uncert_alpha) / 100.))
                 self.img_xz.setImage(
-                    add_transparency(self.data_xz, self.label_xz, float(self.uncert_alpha) / 100., self.color, 0.5))
+                    add_transparency(self.data_xz, self.label_xz, float(self.uncert_alpha) / 100.))
             else:
                 self.img_xy.setImage(self.data_xy)
                 self.img_zy.setImage(self.data_zy)
@@ -822,7 +853,7 @@ class Stats(QtWidgets.QMainWindow):
 
         if self.show_tomoFile != "":
             self.ui.edit_show_tomo.setPlainText(self.show_tomoFile)
-            self.visual_show_info(f"Showing tomo file: {self.show_tomoFile}")
+            self.visual_show_info(f"Showing volume file: {self.show_tomoFile}")
 
             if self.show_tomoFile.split('.')[-1] == 'tif':
                 self.tomo_data = io.imread(self.show_tomoFile)
@@ -850,9 +881,10 @@ class Stats(QtWidgets.QMainWindow):
                 self.uncert_data = np.array(h5py.File(self.show_uncertFile, 'r')['raw'])
             else:
                 raise ValueError(f'Not support the uncert image format of {self.show_uncertFile}')
-            # self.tomo_data = stretch(self.tomo_data)
+            self.tomo_data = stretch(self.tomo_data)
             self.uncert_shape = self.uncert_data.shape
             self.uncert_orig = self.uncert_data
+            self.visual_show_info(f"Uncert image shape: {self.uncert_shape}")
 
             self.MC_updata()
 
