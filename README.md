@@ -39,7 +39,7 @@ The typical install time for these packages is within half hour.
 
 #### 2.Model Training
 
-The predefined config files are provided in`configs/demo_train.json` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
+The predefined config files are provided in`configs/demo_train.json`.  The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
 
 ```
 "train_data_pth":"data/demo.tif" # str, input anisotropic data path. tif or h5 is supported.default "data/demo.tif".
@@ -56,12 +56,22 @@ The predefined config files are provided in`configs/demo_train.json` . The meani
 "train_gpu_ids":"0" # str, ids of available gpu card. supporting single card now. default "0".
 ```
 
+Usually, it is recommended to training model with batch size=2 on graphics cards ranging from 12GB to 24GB. If running on graphics cards smaller than 12GB, consider reducing the batch size<=2.
+
 Model training supports two methods, one is command line and the other is GUI.
 
 (1) Command line:   
 
+Isotropic reconstruction training without slice inpainting: 
+
 ```
 python train.py --train_config_path configs/demo_train.json
+```
+
+Isotropic reconstruction training with slice inpainting: 
+
+```
+python train.py --train_config_path configs/demo_train_inpaint.json
 ```
 
 (2) GUI:
@@ -69,6 +79,14 @@ python train.py --train_config_path configs/demo_train.json
 ![GUI_Training](markdown/GUI_Training.png)
 
 The typical training time for demo data costs several hours.
+
+The training process will generate following files in the work directory:
+
+![](markdown\File.png)
+
+You can observe training loss by three ways: GUI, tensorboard, and csv file. Note that "loss_metric.csv" has 6 colums, #0-train loss, #1-train l1 loss, #2-train ssim loss, #3-null，#4-validation ssim, #5-validation psnr. 
+
+
 
 #### 3.Model Testing
 
@@ -88,8 +106,16 @@ Model testing supports two methods, one is command line and the other is GUI.
 
 (1) Command line: 
 
+Isotropic reconstruction predicting without slice inpainting: 
+
 ```
-python test.py --test_config_path configs/demo_test.json
+python train.py --train_config_path configs/demo_test.json
+```
+
+Isotropic reconstruction predicting with slice inpainting: 
+
+```
+python train.py --train_config_path configs/demo_test_inpaint.json
 ```
 
 (2) GUI:
