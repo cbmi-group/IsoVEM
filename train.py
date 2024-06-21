@@ -83,7 +83,7 @@ def train_func(args, stdout=None):
         print("===> Building models")
         if args.train_is_resume: # loading pretrained model
             model=torch.load(args.train_resume_ckpt_path)
-            args.start_epoch = int(args.pretrain_model.split('/')[-1].split('.')[-2].split('_')[-1]) + 1
+            args.start_epoch = int(args.train_resume_ckpt_path.split('/')[-1].split('.')[-2].split('_')[-1]) + 1
         else: # create a new model
             model = IsoVEM(upscale=args.train_upscale,
                            img_size=args.img_size,
