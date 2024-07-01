@@ -39,7 +39,7 @@ The typical install time for these packages is within half hour.
 
 #### 2.Model Training
 
-The predefined config files are provided in`configs/demo_train.json`.  The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
+The predefined config files are provided in`configs/demo_train.json` . The meaning of each argument has been annotated as follows. You can also define a new config file as needed. 
 
 ```
 "train_data_pth":"data/demo.tif" # str, input anisotropic data path. tif or h5 is supported.default "data/demo.tif".
@@ -129,6 +129,10 @@ The typical testing time for demo data costs within 1 hour.
 The GUI provides image visualization function. It is convenient to determine the slice index of the input data that needs inpaint, and you can view the reconstruction results immediately after the reconstruction is completed. The reconstruction results can be overlayed with uncertainty map.
 
 ![GUI_Visualization](markdown/GUI_Visualization.png)
+
+#### 5.More Data Availabity
+
+The vEM datasets used in our paper are mostly public (EPFL, Cremi, GrayMatter) except one customized Sperm dataset. To prosper research in the field of VEM, we release the Sperm dataset on EMPAIR website (https://www.ebi.ac.uk/empiar/), accession code is EMPAIR-12157(https://www.ebi.ac.uk/empiar/EMPIAR-12157/).
 
 ## Acknowledgement
 
