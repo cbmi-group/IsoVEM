@@ -132,7 +132,7 @@ The GUI provides image visualization function. It is convenient to determine the
 
 #### 5.More Data Availabity
 
-The vEM datasets used in our paper are mostly public (EPFL, Cremi, GrayMatter) except one customized Sperm dataset. To prosper research in the field of VEM, we release the Sperm dataset on EMPAIR website (https://www.ebi.ac.uk/empiar/), accession code is EMPAIR-12157(https://www.ebi.ac.uk/empiar/EMPIAR-12157/).
+The vEM datasets used in our paper are mostly public (EPFL, Cremi, GrayMatter) except one customized Sperm dataset. To prosper research in the field of VEM, we release the Sperm dataset on ZENODO website (https://zenodo.org/records/12748945).
 
 ## Acknowledgement
 
