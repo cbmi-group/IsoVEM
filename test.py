@@ -26,7 +26,7 @@ def run_model_inpaint(model,image,idx_ls, args):
         # ----------
         with torch.no_grad():
             # for each region
-            for i in tqdm(range(coord_np.shape[1]), desc='Inpaint slice '+str(idx)):
+            for i in tqdm(range(coord_np.shape[1]), desc='Inpaint slice with index'+str(idx)):
                 y, x = coord_np[0, i], coord_np[1, i]
                 crop = np.s_[idx - args.test_shape[0] // 2:idx + args.test_shape[0] // 2, y - args.test_shape[1] // 2:y + args.test_shape[1] // 2,
                        x - args.test_shape[2] // 2:x + args.test_shape[2] // 2]
@@ -40,14 +40,14 @@ def run_model_inpaint(model,image,idx_ls, args):
         # ----------
         #  2D Stitch
         # ----------
-        print("Stitching takes some time...")
+        print("2D Stitching ...")
         stitch_vol=stitch2D(vol_ls, (image.shape[1],image.shape[2]), (args.test_shape[1], args.test_shape[2]), args.test_overlap)
         pred_inpaint_ls.append(float2uint8(stitch_vol))
 
     return pred_inpaint_ls
 
 
-def run_model_isosr(model,image,scale_factor):
+def run_model_isosr(model,image,scale_factor, args):
     '''
     model inference for isotropic reconstruction with uncertainty map.
     :param model: pretrained isovem model
@@ -106,9 +106,11 @@ def run_model_isosr(model,image,scale_factor):
     # ----------
     #  3D stitch
     # ----------
-    print("Stitching takes some time...")
+    print("3D Stitching takes some time which running on CPU...")
     stitch_isosr = stitch3D(vol_pred_ls, image.shape, args.test_shape, args.test_overlap, args.test_upscale)
+    print("Reconstructed image has stitched.")
     stitch_isosr_map = stitch3D(vol_uncertainty_ls, image.shape, args.test_shape, args.test_overlap, args.test_upscale)
+    print("Uncertainty map has stitched.")
     return float2uint8(stitch_isosr),float2uint8(stitch_isosr_map)
 
 def test_func(args, stdout=None):
@@ -118,6 +120,7 @@ def test_func(args, stdout=None):
         sys.stdout = stdout
         sys.stderr = stdout
 
+    args.test_inpaint_index = [int(float(i)) for i in args.test_inpaint_index]
     print("===> Preparing environment")
     torch.cuda.set_device(int(args.test_gpu_ids))
     os.makedirs(args.test_output_dir, exist_ok=True)
@@ -147,7 +150,7 @@ def test_func(args, stdout=None):
         args.test_shape = (16, 160, 160)
         args.test_overlap = 8
     else:
-        raise ValueError(f'Not support the upscale factor {args.train_upscale}')
+        raise ValueError(f'Not support the upscale factor {args.test_upscale}')
 
     # ----------
     #  Model Inference for slice inpainting
@@ -162,7 +165,7 @@ def test_func(args, stdout=None):
     # ----------
     #  Model Inference for isotropic reconstruction with uncertainty map
     # ----------
-    pred_isosr, pred_isosr_map = run_model_isosr(model, image_file, args.test_upscale)
+    pred_isosr, pred_isosr_map = run_model_isosr(model, image_file, args.test_upscale, args)
     io.imsave(os.path.join(args.test_output_dir, 'isosr.tif'), pred_isosr)
     print('Isotropic reconstructed volume is saved to {}, named {}'.format(args.test_output_dir, 'isosr.tif'))
     io.imsave(os.path.join(args.test_output_dir, 'isosr_map.tif'), pred_isosr_map)

@@ -1,9 +1,10 @@
 {
+    "test_config_name": "demo_test",
     "test_data_pth":"data/demo.tif",
-    "test_ckpt_path":"train/checkpoint/model_epoch_1.pth",
-    "test_output_dir": "test",
+    "test_ckpt_path":"pretrain/EPFL_8_IsoSR_196.pth",
+    "test_output_dir": "result/demo_test",
     "test_upscale":  8,
-    "test_inpaint": true,
+    "test_inpaint": false,
     "test_inpaint_index": [],
     "test_gpu_ids":"0"
 }

@@ -1,6 +1,7 @@
 {
+    "train_config_name": "demo_train",
     "train_data_pth":"data/demo.tif",
-    "train_output_dir":"train",
+    "train_output_dir":"result/demo_train",
     "train_data_split":0.7,
     "train_upscale":8,
     "train_inpaint":false,

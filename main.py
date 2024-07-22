@@ -16,6 +16,7 @@ import h5py
 import numpy as np
 from utils import *
 
+
 class Stats(QtWidgets.QMainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
@@ -49,7 +50,7 @@ class Stats(QtWidgets.QMainWindow):
         self.train_inpaint = True if self.ui.train_ckb_inpaint.isChecked() else False
         self.ui.train_ckb_resume.stateChanged.connect(self.train_resume_stateChanged)
         self.ui.pBut_add_ckpt_path.clicked.connect(self.train_load_weightPath)
-        self.train_resume_weightPath=self.ui.pBut_add_ckpt_path.text()
+        self.train_resume_weightPath = self.ui.pBut_add_ckpt_path.text()
         if not self.ui.train_ckb_resume.isChecked():
             self.train_resume = False
             self.ui.train_edit_ckpt_path.setText("")
@@ -134,9 +135,11 @@ class Stats(QtWidgets.QMainWindow):
     """
     Training funcs
     """
+
     def train_show_info(self, info):
         self.ui.train_txtB.insertPlainText(f"{info}\n")
         self.ui.train_txtB.ensureCursorVisible()
+
     def train_configName_change(self):
         self.train_configName = self.ui.train_edit_config_name.text()
         self.train_show_info(f"Training config name: {self.train_configName}")
@@ -188,7 +191,7 @@ class Stats(QtWidgets.QMainWindow):
     def train_lr_change(self):
         self.train_lr = float(self.ui.train_edit_lr.text())
         self.train_show_info(f"Training - learning rate: {self.train_lr}")
-    
+
     def train_inpaint_stateChanged(self):
         if self.ui.train_ckb_inpaint.isChecked():
             self.train_inpaint = True
@@ -237,20 +240,30 @@ class Stats(QtWidgets.QMainWindow):
                 or (self.ui.train_edit_ckpt_path.text() == "" and self.ui.train_ckb_resume.isChecked()):
             QMessageBox.critical(self, 'Error', 'Incomplete information')
         else:
-            train_output_dir=self.train_output_data_path if isinstance(self.train_output_data_path, str) else self.train_output_data_path[0]
+            train_output_dir = self.train_output_data_path if isinstance(self.train_output_data_path, str) else \
+            self.train_output_data_path[0]
             self.train_configs = dict(
-                train_config_name=(self.train_configName if isinstance(self.train_configName, str) else self.train_configName[0]),
-                train_data_pth=self.train_input_data_path if isinstance(self.train_input_data_path, str) else self.train_input_data_path[0],
-                train_output_dir=self.train_output_data_path if isinstance(self.train_output_data_path, str) else self.train_output_data_path[0],
-                train_data_split=self.train_val_split if isinstance(self.train_val_split, float) else self.train_val_split[0],
-                train_upscale=self.train_upscale_factor if isinstance(self.train_upscale_factor, int) else self.train_upscale_factor[0],
+                train_config_name=(
+                    self.train_configName if isinstance(self.train_configName, str) else self.train_configName[0]),
+                train_data_pth=self.train_input_data_path if isinstance(self.train_input_data_path, str) else
+                self.train_input_data_path[0],
+                train_output_dir=self.train_output_data_path if isinstance(self.train_output_data_path, str) else
+                self.train_output_data_path[0],
+                train_data_split=self.train_val_split if isinstance(self.train_val_split, float) else
+                self.train_val_split[0],
+                train_upscale=self.train_upscale_factor if isinstance(self.train_upscale_factor, int) else
+                self.train_upscale_factor[0],
                 train_inpaint=True if self.ui.train_ckb_inpaint.isChecked() else False,
-                train_epoch=self.train_max_epochs if isinstance(self.train_max_epochs, int) else self.train_max_epochs[0],
+                train_epoch=self.train_max_epochs if isinstance(self.train_max_epochs, int) else self.train_max_epochs[
+                    0],
                 train_bs=self.train_batch_size if isinstance(self.train_batch_size, int) else self.train_batch_size[0],
                 train_lr=self.train_lr if isinstance(self.train_lr, float) else self.train_lr[0],
-                train_ckpt_interval=self.train_ckpt_interval if isinstance(self.train_ckpt_interval, int) else self.train_ckpt_interval[0],
+                train_ckpt_interval=self.train_ckpt_interval if isinstance(self.train_ckpt_interval, int) else
+                self.train_ckpt_interval[0],
                 train_is_resume=True if self.ui.train_ckb_resume.isChecked() else False,
-                train_resume_ckpt_path=self.train_resume_weightPath if isinstance(self.train_resume_weightPath, str) else self.train_resume_weightPath[0],
+                train_resume_ckpt_path=self.train_resume_weightPath if isinstance(self.train_resume_weightPath,
+                                                                                  str) else
+                self.train_resume_weightPath[0],
                 train_gpu_ids=self.train_gpuIds if isinstance(self.train_gpuIds, str) else self.train_gpuIds[0],
             )
             config_save_path = 'configs'
@@ -287,7 +300,6 @@ class Stats(QtWidgets.QMainWindow):
         self.train_gpuIds = self.train_configs['train_gpu_ids']
         self.train_lr = self.train_configs['train_lr']
         self.train_resume_weightPath = self.train_configs['train_resume_ckpt_path']
-
 
         self.ui.train_edit_config_name.setText(self.train_configName)
         self.ui.edit_train_data_path.setText(self.train_input_data_path)
@@ -341,7 +353,6 @@ class Stats(QtWidgets.QMainWindow):
         self.train_gpuIds = self.train_configs['train_gpu_ids']
         self.train_lr = self.train_configs['train_lr']
         self.train_resume_weightPath = self.train_configs['train_resume_ckpt_path']
-
 
         self.ui.train_edit_config_name.setText(self.train_configName)
         self.ui.edit_train_data_path.setText(self.train_input_data_path)
@@ -438,7 +449,7 @@ class Stats(QtWidgets.QMainWindow):
             self.train_loss_show = True
             self.ui.widget_show_loss.setVisible(True)
             self.loss_timer_start()
-            self.train_show_info(f"Training - loss showing: {self.train_resume}")
+            self.train_show_info(f"Training - loss showing")
         else:
             self.train_loss_show = False
             self.loss_timer_stop()
@@ -454,7 +465,7 @@ class Stats(QtWidgets.QMainWindow):
 
     def loss_update(self):
         if self.train_output_data_path != "" and \
-              os.path.isfile(os.path.join(self.train_output_data_path, 'loss_metric.csv')):
+                os.path.isfile(os.path.join(self.train_output_data_path, 'loss_metric.csv')):
             # 6列，0-train loss，1-train l1 loss, 2-train ssim loss, 3-全0无意义，4-validation ssim, 5-validation psnr
             data = np.loadtxt(os.path.join(self.train_output_data_path, 'loss_metric.csv'), delimiter=',')
             self.loss_curve.setData(data[:, 0])
@@ -465,6 +476,7 @@ class Stats(QtWidgets.QMainWindow):
     """
     Predicting
     """
+
     def test_show_info(self, info):
         self.ui.test_txtB.insertPlainText(f"{info}\n")
         self.ui.test_txtB.ensureCursorVisible()
@@ -550,15 +562,21 @@ class Stats(QtWidgets.QMainWindow):
             QMessageBox.critical(self, 'Error', 'Incomplete information')
         else:
             self.test_configs = dict(
-                test_config_name=(self.test_configName if isinstance(self.test_configName, str) else self.test_configName[0]),
-                test_data_pth=self.test_input_data_path if isinstance(self.test_input_data_path, str) else self.test_input_data_path[0],
-                test_output_dir=self.test_output_data_path if isinstance(self.test_output_data_path, str) else self.test_output_data_path[0],
-                test_ckpt_path=self.test_weightPath if isinstance(self.test_weightPath, str) else self.test_weightPath[0],
+                test_config_name=(
+                    self.test_configName if isinstance(self.test_configName, str) else self.test_configName[0]),
+                test_data_pth=self.test_input_data_path if isinstance(self.test_input_data_path, str) else
+                self.test_input_data_path[0],
+                test_output_dir=self.test_output_data_path if isinstance(self.test_output_data_path, str) else
+                self.test_output_data_path[0],
+                test_ckpt_path=self.test_weightPath if isinstance(self.test_weightPath, str) else self.test_weightPath[
+                    0],
                 # train_config_path=self.test_Trainconfig_path if isinstance(self.test_Trainconfig_path, str) else self.test_Trainconfig_path[0],
-                test_upscale=self.test_upscale_factor if isinstance(self.test_upscale_factor, int) else self.test_upscale_factor[0],
+                test_upscale=self.test_upscale_factor if isinstance(self.test_upscale_factor, int) else
+                self.test_upscale_factor[0],
                 test_gpu_ids=self.test_gpuIds if isinstance(self.test_gpuIds, str) else self.test_gpuIds[0],
                 test_inpaint=True if self.ui.test_ckb_inpaint.isChecked() else False,
-                test_inpaint_index=self.test_inpaint_ids if isinstance(self.test_inpaint_ids, str) else self.test_inpaint_ids[0],
+                test_inpaint_index=self.test_inpaint_ids if isinstance(self.test_inpaint_ids, str) else
+                self.test_inpaint_ids[0],
             )
             config_save_path = 'configs'
             os.makedirs(config_save_path, exist_ok=True)
@@ -601,7 +619,7 @@ class Stats(QtWidgets.QMainWindow):
             self.ui.test_edit_inpaint_ids.setText(self.test_inpaint_ids)
         else:
             self.ui.test_ckb_inpaint.setChecked(False)
-            self.test_inpaint_ids=""
+            self.test_inpaint_ids = ""
             self.ui.test_edit_inpaint_ids.setText("")
 
         self.test_show_info('*' * 100)
@@ -643,7 +661,7 @@ class Stats(QtWidgets.QMainWindow):
             self.ui.test_edit_inpaint_ids.setText(self.test_inpaint_ids)
         else:
             self.ui.test_ckb_inpaint.setChecked(False)
-            self.test_inpaint_ids=""
+            self.test_inpaint_ids = ""
             self.ui.test_edit_inpaint_ids.setText("")
 
         self.test_show_info('*' * 100)
@@ -690,10 +708,10 @@ class Stats(QtWidgets.QMainWindow):
             self.train_show_info('*' * 100)
 
         parser = argparse.ArgumentParser(description='Parameters for IsoVEM Training')
-        parser.add_argument('--test_config_path', help='path of test config file', type=str,
-                            default="configs/demo_test.json")
+        # parser.add_argument('--test_config_path', help='path of test config file', type=str,
+        #                     default=self.test_config_save_path)
 
-        with open(parser.parse_args().test_config_path, 'r', encoding='UTF-8') as f:
+        with open(self.test_config_save_path, 'r', encoding='UTF-8') as f:
             test_config = json.load(f)
         add_dict_to_argparser(parser, test_config)
         args = parser.parse_args()
@@ -708,6 +726,7 @@ class Stats(QtWidgets.QMainWindow):
     """
     Visualization
     """
+
     def visual_show_info(self, info):
         self.ui.visual_txtB.insertPlainText(f"{info}\n")
         self.ui.visual_txtB.ensureCursorVisible()
@@ -722,7 +741,7 @@ class Stats(QtWidgets.QMainWindow):
                 self.tomo_data = np.array(h5py.File(self.show_tomoFile, 'r')['raw'])
             else:
                 raise ValueError(f'Not support the image format of {self.show_tomoFile}')
-            #self.tomo_data = stretch(self.tomo_data)
+            # self.tomo_data = stretch(self.tomo_data)
         z_max, y_max, x_max = self.tomo_data.shape
 
         self.data_xy = np.transpose(self.tomo_data[int(z_max // 2), :, :])
@@ -820,7 +839,7 @@ class Stats(QtWidgets.QMainWindow):
                               f"({self.uncert_data[int(self.z), int(self.y), int(self.x)]:.0f})")
         else:
             self.text.setText(f"({self.x:.0f}, {self.y:.0f}, {self.z:.0f}), "
-                          f"{self.tomo_data[int(self.z), int(self.y), int(self.x)]:.0f}")
+                              f"{self.tomo_data[int(self.z), int(self.y), int(self.x)]:.0f}")
         self.data_xy = np.transpose(self.tomo_data[int(self.z), :, :])
         self.data_zy = self.tomo_data[:, :, int(self.x)]
         self.data_xz = np.transpose(self.tomo_data[:, int(self.y), :])
@@ -910,6 +929,7 @@ class Stats(QtWidgets.QMainWindow):
         self.uncert_alpha = self.ui.hSlider_uncert_alpha.value()
         self.ui.edit_uncert_alpha.setText(f"{float(self.uncert_alpha) / 100.:0.2f}")
         self.MC_updata()
+
 
 app = QApplication([])
 stats = Stats()
