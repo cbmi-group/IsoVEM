@@ -8,17 +8,15 @@ IsoVEM is a deep learning-based method for robust high-resolution high-fidelity 
 
 #### 1. Install dependencies
 
-Here's a summary of the critical dependencies.
+ The conda environment must be set up. Please visit the official website and follow their instructions for anadonda installation: https://www.anaconda.com/
 
-- python 3.8.3
-- pytorch 1.8.1
-- CUDA 11.1
-
-We recommend the following demand to install all of the dependencies.
+We recommend the following demand to install all of the dependencies. The critical dependencies are python 3.8.3, pytorch 1.8.1 and CUDA 11.1.
 
 ```
 $ conda create -n isovem python=3.8.3
 $ conda activate isovem
+$ git clone https://github.com/cbmi-group/IsoVEM.git
+$ cd IsoVEM
 $ pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 pytorch_msssim==1.0.0 -f https://download.pytorch.org/whl/torch_stable.html
 $ pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 ```
