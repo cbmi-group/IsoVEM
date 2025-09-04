@@ -1,0 +1,15 @@
+{
+    "train_config_name": "demo_train",
+    "train_data_pth":"data/demo.tif",
+    "train_output_dir":"result/demo_train_decimal",
+    "train_data_split":0.7,
+    "train_upscale":6.5,
+    "train_inpaint":false,
+    "train_epoch":200,
+    "train_bs":2,
+    "train_lr":1e-3,
+    "train_ckpt_interval":1,
+    "train_is_resume":false,
+    "train_resume_ckpt_path":null,
+    "train_gpu_ids":"0"
+}

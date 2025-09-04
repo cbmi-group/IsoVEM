@@ -1,0 +1,10 @@
+{
+    "test_config_name": "demo_test",
+    "test_data_pth":"data/demo.tif",
+    "test_ckpt_path":"pretrain/EPFL_8_IsoSR_196.pth",
+    "test_output_dir": "result/demo_test_decimal",
+    "test_upscale": 6.5,
+    "test_inpaint": false,
+    "test_inpaint_index": [],
+    "test_gpu_ids":"0"
+}

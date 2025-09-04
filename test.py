@@ -143,15 +143,19 @@ def test_func(args, stdout=None):
     # ----------
     #  Generate hyperparams
     # ----------
-    if args.test_upscale == 8:
+    scale_candidates = [4, 8, 10]
+    args.test_int_upscale = min(scale_candidates, key=lambda x: abs(x - args.test_upscale))
+
+    if args.test_int_upscale == 4:
+        args.test_shape = (32, 128, 128)
+    elif args.test_int_upscale == 8:
         args.test_shape = (16, 128, 128)
-        args.test_overlap = 8
-    elif args.test_upscale == 10:
+    elif args.test_int_upscale == 10:
         args.test_shape = (16, 160, 160)
-        args.test_overlap = 8
     else:
         raise ValueError(f'Not support the upscale factor {args.test_upscale}')
 
+    args.test_overlap = 8
     # ----------
     #  Model Inference for slice inpainting
     # ----------
