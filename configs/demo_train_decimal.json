@@ -3,7 +3,7 @@
     "train_data_pth":"data/demo.tif",
     "train_output_dir":"result/demo_train_decimal",
     "train_data_split":0.7,
-    "train_upscale":6.5,
+    "train_upscale":5.2,
     "train_inpaint":false,
     "train_epoch":200,
     "train_bs":2,

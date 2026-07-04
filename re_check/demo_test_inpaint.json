@@ -1,0 +1,10 @@
+{
+    "test_config_name": "demo_test_inpaint",
+    "test_data_pth":"data/demo_debris.tif",
+    "test_ckpt_path":"re_check/result/train/checkpoint/model_epoch_198.pth",
+    "test_output_dir": "re_check/result/prediction198",
+    "test_upscale":  8,
+    "test_inpaint": true,
+    "test_inpaint_index": [16,29,48],
+    "test_gpu_ids":"0"
+}

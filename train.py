@@ -37,20 +37,20 @@ def train_func(args, stdout=None):
         #  Generate hyperparams
         # ----------
         print("===> Preparing hyperparameters")
-        scale_candidates=[4,8,10]
+        scale_candidates=[1,4,8,10]
         args.train_upscale=min(scale_candidates, key=lambda x: abs(x - args.train_upscale))
 
         if args.train_upscale==4:
             # subvolume size
-            args.subvol_shape = (32, 128, 128)
+            args.subvol_shape = (16, 128, 128)
             # transformer params
-            args.img_size = [8, 32, 128]  # video sequence size
+            args.img_size = [16, 16, 64]  # video sequence size
             args.window_size = [4, 4, 16]  # window attention
             args.depths = [4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2]  # number of TMSA in TRSA
             args.indep_reconsts = [11, 12]  # per-frame window attention in the end
             args.embed_dims = [40, 40, 40, 40, 40, 40, 40, 60, 60, 60, 60, 60, 60]  # feature channels
             args.num_heads = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  # number of heads for window attention
-        if args.train_upscale==8:
+        elif args.train_upscale==8:
             # subvolume size
             args.subvol_shape = (16, 128, 128)
             # transformer params
@@ -64,11 +64,11 @@ def train_func(args, stdout=None):
             # subvolume size
             args.subvol_shape = (16, 160, 160)
             # transformer params
-            args.img_size = [16, 16, 160],  # video sequence size
-            args.window_size = [4, 2, 20],  # window attention
-            args.depths = [4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2],  # number of TMSA in TRSA
+            args.img_size = [16, 16, 160]  # video sequence size
+            args.window_size = [4, 2, 20]  # window attention
+            args.depths = [4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2]  # number of TMSA in TRSA
             args.indep_reconsts = [11, 12],  # per-frame window attention in the end
-            args.embed_dims = [40, 40, 40, 40, 40, 40, 40, 60, 60, 60, 60, 60, 60],  # feature channels
+            args.embed_dims = [40, 40, 40, 40, 40, 40, 40, 60, 60, 60, 60, 60, 60]  # feature channels
             args.num_heads = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  # number of heads for window attention
         else:
             raise ValueError(f'Not support the upscale factor {args.train_upscale}')
@@ -106,7 +106,9 @@ def train_func(args, stdout=None):
                            depths=args.depths,
                            indep_reconsts=args.indep_reconsts,
                            embed_dims=args.embed_dims,
-                           num_heads=args.num_heads)
+                           num_heads=args.num_heads,
+                           use_checkpoint_attn=True,
+                           use_checkpoint_ffn=True)
             args.start_epoch = 1
 
         # create optimizer
