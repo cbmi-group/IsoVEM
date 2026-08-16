@@ -107,9 +107,9 @@ def run_model_isosr(model,image,scale_factor, args):
     #  3D stitch
     # ----------
     print("3D Stitching takes some time which running on CPU...")
-    stitch_isosr = stitch3D(vol_pred_ls, image.shape, args.test_shape, args.test_overlap, args.test_upscale)
+    stitch_isosr = stitch3D(vol_pred_ls, image.shape, args.test_shape, args.test_overlap, args.requested_scale)
     print("Reconstructed image has stitched.")
-    stitch_isosr_map = stitch3D(vol_uncertainty_ls, image.shape, args.test_shape, args.test_overlap, args.test_upscale)
+    stitch_isosr_map = stitch3D(vol_uncertainty_ls, image.shape, args.test_shape, args.test_overlap, args.requested_scale)
     print("Uncertainty map has stitched.")
     return float2uint8(stitch_isosr),float2uint8(stitch_isosr_map)
 
@@ -144,7 +144,7 @@ def test_func(args, stdout=None):
     #  Generate hyperparams
     # ----------
     scale_candidates = [4, 8, 10]
-    args.test_int_upscale = min(scale_candidates, key=lambda x: abs(x - args.test_upscale))
+    args.test_int_upscale = min(scale_candidates, key=lambda x: abs(x - args.requested_scale))
 
     if args.test_int_upscale == 4:
         args.test_shape = (32, 128, 128)
@@ -153,7 +153,7 @@ def test_func(args, stdout=None):
     elif args.test_int_upscale == 10:
         args.test_shape = (16, 160, 160)
     else:
-        raise ValueError(f'Not support the upscale factor {args.test_upscale}')
+        raise ValueError(f'Not support the upscale factor {args.requested_scale}')
 
     args.test_overlap = 8
     # ----------
@@ -169,7 +169,7 @@ def test_func(args, stdout=None):
     # ----------
     #  Model Inference for isotropic reconstruction with uncertainty map
     # ----------
-    pred_isosr, pred_isosr_map = run_model_isosr(model, image_file, args.test_upscale, args)
+    pred_isosr, pred_isosr_map = run_model_isosr(model, image_file, args.requested_scale, args)
     io.imsave(os.path.join(args.test_output_dir, 'isosr.tif'), pred_isosr)
     print('Isotropic reconstructed volume is saved to {}, named {}'.format(args.test_output_dir, 'isosr.tif'))
     io.imsave(os.path.join(args.test_output_dir, 'isosr_map.tif'), pred_isosr_map)

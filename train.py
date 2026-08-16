@@ -37,10 +37,34 @@ def train_func(args, stdout=None):
         #  Generate hyperparams
         # ----------
         print("===> Preparing hyperparameters")
-        scale_candidates=[1,4,8,10]
-        args.train_upscale=min(scale_candidates, key=lambda x: abs(x - args.train_upscale))
+        scale_candidates=[2,4,8,10]
+        # The raw scale requested by the user, which may be a decimal (e.g. 5.2).
+        # Backward/forward compatible: prefer the explicit requested_scale, otherwise
+        # fall back to the anchor scale (or the legacy train_upscale key).
+        if getattr(args, "requested_scale", None) is not None:
+            requested_scale = args.requested_scale
+        elif getattr(args, "Train_anchor_scale", None) is not None:
+            requested_scale = args.Train_anchor_scale
+        else:
+            requested_scale = args.train_upscale
+        # The trainable scales are fixed (anchor scales). Map the requested scale to the
+        # nearest anchor scale actually used during training, so a decimal request is never
+        # used literally for training.
+        args.Train_anchor_scale=min(scale_candidates, key=lambda x: abs(x - requested_scale))
+        print("Requested scale is {}, the upscale factor for training process will be mapped to the nearest anchor scale {}.".format(
+            requested_scale, args.Train_anchor_scale))
 
-        if args.train_upscale==4:
+        if args.Train_anchor_scale==2:
+            # subvolume size
+            args.subvol_shape = (16, 128, 128)
+            # transformer params
+            args.img_size = [16, 64, 128]  # video sequence size
+            args.window_size = [2, 8, 16]  # window attention
+            args.depths = [4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2]  # number of TMSA in TRSA
+            args.indep_reconsts = [11, 12]  # per-frame window attention in the end
+            args.embed_dims = [40, 40, 40, 40, 40, 40, 40, 60, 60, 60, 60, 60, 60]  # feature channels
+            args.num_heads = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  # number of heads for window attention
+        elif args.Train_anchor_scale==4:
             # subvolume size
             args.subvol_shape = (16, 128, 128)
             # transformer params
@@ -50,7 +74,7 @@ def train_func(args, stdout=None):
             args.indep_reconsts = [11, 12]  # per-frame window attention in the end
             args.embed_dims = [40, 40, 40, 40, 40, 40, 40, 60, 60, 60, 60, 60, 60]  # feature channels
             args.num_heads = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  # number of heads for window attention
-        elif args.train_upscale==8:
+        elif args.Train_anchor_scale==8:
             # subvolume size
             args.subvol_shape = (16, 128, 128)
             # transformer params
@@ -60,18 +84,18 @@ def train_func(args, stdout=None):
             args.indep_reconsts = [11, 12]  # per-frame window attention in the end
             args.embed_dims = [40, 40, 40, 40, 40, 40, 40, 60, 60, 60, 60, 60, 60]  # feature channels
             args.num_heads = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  # number of heads for window attention
-        elif args.train_upscale == 10:
+        elif args.Train_anchor_scale == 10:
             # subvolume size
             args.subvol_shape = (16, 160, 160)
             # transformer params
             args.img_size = [16, 16, 160]  # video sequence size
             args.window_size = [4, 2, 20]  # window attention
             args.depths = [4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2]  # number of TMSA in TRSA
-            args.indep_reconsts = [11, 12],  # per-frame window attention in the end
+            args.indep_reconsts = [11, 12]  # per-frame window attention in the end
             args.embed_dims = [40, 40, 40, 40, 40, 40, 40, 60, 60, 60, 60, 60, 60]  # feature channels
             args.num_heads = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  # number of heads for window attention
         else:
-            raise ValueError(f'Not support the upscale factor {args.train_upscale}')
+            raise ValueError(f'Not support the upscale factor {args.Train_anchor_scale}')
 
         # ----------
         #  Datasets
@@ -80,14 +104,14 @@ def train_func(args, stdout=None):
         # loading training dataset
         train_dataloader = DataLoader(
             ImageDataset_train(image_pth=args.train_data_pth, image_split=args.train_data_split, subvol_shape=args.subvol_shape,
-                               scale_factor=args.train_upscale, is_inpaint=args.train_inpaint),
+                               scale_factor=args.Train_anchor_scale, is_inpaint=args.train_inpaint),
             batch_size=args.train_bs,
             shuffle=True,
         )
         # loading validation dataset
         val_dataloader = DataLoader(
             ImageDataset_val(image_pth=args.train_data_pth, image_split=args.train_data_split, subvol_shape=args.subvol_shape,
-                             scale_factor=args.train_upscale, is_inpaint=args.train_inpaint),
+                             scale_factor=args.Train_anchor_scale, is_inpaint=args.train_inpaint),
             batch_size=args.train_bs,
             shuffle=False,
         )
@@ -100,7 +124,7 @@ def train_func(args, stdout=None):
             model=torch.load(args.train_resume_ckpt_path)
             args.start_epoch = int(args.train_resume_ckpt_path.split('/')[-1].split('.')[-2].split('_')[-1]) + 1
         else: # create a new model
-            model = IsoVEM(upscale=args.train_upscale,
+            model = IsoVEM(upscale=args.Train_anchor_scale,
                            img_size=args.img_size,
                            window_size=args.window_size,
                            depths=args.depths,
@@ -147,7 +171,7 @@ def train_func(args, stdout=None):
                 #  Perform x/y-axis isotropic reconstruction
                 # --------------
                 # imgs_lr=transforms.Normalize([0.5], [0.5])(imgs_lr)
-                gen_hr = model(imgs_lr, current_scale=args.train_upscale)
+                gen_hr = model(imgs_lr, current_scale=args.Train_anchor_scale)
                 # gen_hr = 0.5 * (gen_hr + 1.0)
 
                 # --------------
@@ -199,7 +223,7 @@ def train_func(args, stdout=None):
                     #  Perform x/y-axis isotropic reconstruction
                     # --------------
                     # val_img_lr = transforms.Normalize([0.5], [0.5])(val_img_lr)
-                    val_gen_hr = model(x=val_img_lr, current_scale=args.train_upscale)
+                    val_gen_hr = model(x=val_img_lr, current_scale=args.Train_anchor_scale)
                     # val_gen_hr =0.5 * (val_gen_hr + 1.0)
 
                     val_ssim = compute_ssim(val_gen_hr, val_img_hr, need_2d=False)[0]

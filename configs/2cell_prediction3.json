@@ -3,7 +3,7 @@
     "test_data_pth":"/lustre1/yanzhang/IsoVEM/556stared-wt-20240613-aligned-cut.tif",
     "test_ckpt_path":"result/Inpaint_train3/checkpoint/model_epoch_200.pth",
     "test_output_dir": "result/Inpaint_prediction3",
-    "test_upscale":  7,
+    "requested_scale":  7,
     "test_inpaint": true,
     "test_inpaint_index": [16,24,36],
     "test_gpu_ids":"0"

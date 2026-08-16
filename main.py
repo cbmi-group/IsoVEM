@@ -34,8 +34,12 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.train_edit_output_path.textChanged.connect(self.train_edit_output_path_change)
         self.ui.train_edit_data_split.textChanged.connect(self.train_val_split_change)
         self.train_val_split = float(self.ui.train_edit_data_split.text())
-        self.train_upscale_factor = self.ui.train_sb_upscale.value()
+        self.train_requested_scale = round(self.ui.train_sb_upscale.value(), 1)
         self.ui.train_sb_upscale.valueChanged.connect(self.train_upscale_change)
+        # The trainable scales are fixed anchor scales; the requested scale (which may be a
+        # decimal) is mapped to the nearest one for the actual training process.
+        self.train_anchor_scale = self.compute_anchor_scale(self.train_requested_scale)
+        self.ui.train_sb_anchor.setValue(self.train_anchor_scale)
         self.train_max_epochs = self.ui.train_sb_maxEpochs.value()
         self.ui.train_sb_maxEpochs.valueChanged.connect(self.train_maxEpochs_change)
         self.train_batch_size = self.ui.train_sb_batchSize.value()
@@ -89,7 +93,7 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.pBut_add_train_config_path.setVisible(False)
         self.ui.test_edit_train_config_path.setVisible(False)
         self.ui.label_12.setVisible(False)
-        self.test_upscale_factor = self.ui.test_sb_upscale.value()
+        self.test_requested_scale = round(self.ui.test_sb_upscale.value(), 1)
         self.ui.test_sb_upscale.valueChanged.connect(self.test_upscale_change)
         self.ui.test_edit_gpuIds.textChanged.connect(self.test_gpuIds_change)
         self.test_gpuIds = self.ui.test_edit_gpuIds.text()
@@ -168,9 +172,21 @@ class Stats(QtWidgets.QMainWindow):
         self.train_val_split = float(self.ui.train_edit_data_split.text())
         self.train_show_info(f"Training - val_split: {self.train_val_split}")
 
+    @staticmethod
+    def compute_anchor_scale(requested_scale):
+        # Map the requested scale (possibly a decimal) to the nearest fixed anchor scale
+        # actually used for training. Keep this consistent with train.py.
+        scale_candidates = [2, 4, 8, 10]
+        return min(scale_candidates, key=lambda x: abs(x - requested_scale))
+
     def train_upscale_change(self):
-        self.train_upscale_factor = self.ui.train_sb_upscale.value()
-        self.train_show_info(f"Training - upscale_factor: {self.train_upscale_factor}")
+        # Keep one decimal place so decimal requested scales stay clean (avoid float noise).
+        self.train_requested_scale = round(self.ui.train_sb_upscale.value(), 1)
+        # Auto-fill the Train_anchor_scale according to the rounding algorithm.
+        self.train_anchor_scale = self.compute_anchor_scale(self.train_requested_scale)
+        self.ui.train_sb_anchor.setValue(self.train_anchor_scale)
+        self.train_show_info(f"Training - requested scale: {self.train_requested_scale}")
+        self.train_show_info(f"Training - Train_anchor_scale: {self.train_anchor_scale}")
 
     def train_maxEpochs_change(self):
         self.train_max_epochs = self.ui.train_sb_maxEpochs.value()
@@ -251,8 +267,10 @@ class Stats(QtWidgets.QMainWindow):
                 self.train_output_data_path[0],
                 train_data_split=self.train_val_split if isinstance(self.train_val_split, float) else
                 self.train_val_split[0],
-                train_upscale=self.train_upscale_factor if isinstance(self.train_upscale_factor, int) else
-                self.train_upscale_factor[0],
+                requested_scale=self.train_requested_scale if isinstance(self.train_requested_scale, (int, float)) else
+                self.train_requested_scale[0],
+                Train_anchor_scale=self.train_anchor_scale if isinstance(self.train_anchor_scale, int) else
+                self.train_anchor_scale[0],
                 train_inpaint=True if self.ui.train_ckb_inpaint.isChecked() else False,
                 train_epoch=self.train_max_epochs if isinstance(self.train_max_epochs, int) else self.train_max_epochs[
                     0],
@@ -291,7 +309,9 @@ class Stats(QtWidgets.QMainWindow):
         self.train_input_data_path = self.train_configs['train_data_pth']
         self.train_output_data_path = self.train_configs['train_output_dir']
         self.train_val_split = self.train_configs['train_data_split']
-        self.train_upscale_factor = self.train_configs['train_upscale']
+        self.train_requested_scale = self.train_configs['requested_scale']
+        self.train_anchor_scale = self.train_configs.get('Train_anchor_scale',
+                                                         self.compute_anchor_scale(self.train_requested_scale))
         self.train_max_epochs = self.train_configs['train_epoch']
         self.train_inpaint = True if self.train_configs['train_inpaint'] is True else False
         self.train_resume = True if self.train_configs['train_is_resume'] is True else False
@@ -305,7 +325,8 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.edit_train_data_path.setText(self.train_input_data_path)
         self.ui.train_edit_output_path.setText(self.train_output_data_path)
         self.ui.train_edit_data_split.setText(str(self.train_val_split))
-        self.ui.train_sb_upscale.setValue(self.train_upscale_factor)
+        self.ui.train_sb_upscale.setValue(self.train_requested_scale)
+        self.ui.train_sb_anchor.setValue(self.train_anchor_scale)
         self.ui.train_sb_maxEpochs.setValue(self.train_max_epochs)
         self.ui.train_sb_batchSize.setValue(self.train_batch_size)
         self.ui.train_sb_ckpt_interval.setValue(self.train_ckpt_interval)
@@ -344,7 +365,9 @@ class Stats(QtWidgets.QMainWindow):
         self.train_input_data_path = self.train_configs['train_data_pth']
         self.train_output_data_path = self.train_configs['train_output_dir']
         self.train_val_split = self.train_configs['train_data_split']
-        self.train_upscale_factor = self.train_configs['train_upscale']
+        self.train_requested_scale = self.train_configs['requested_scale']
+        self.train_anchor_scale = self.train_configs.get('Train_anchor_scale',
+                                                         self.compute_anchor_scale(self.train_requested_scale))
         self.train_max_epochs = self.train_configs['train_epoch']
         self.train_inpaint = True if self.train_configs['train_inpaint'] is True else False
         self.train_resume = True if self.train_configs['train_is_resume'] is True else False
@@ -358,7 +381,8 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.edit_train_data_path.setText(self.train_input_data_path)
         self.ui.train_edit_output_path.setText(self.train_output_data_path)
         self.ui.train_edit_data_split.setText(str(self.train_val_split))
-        self.ui.train_sb_upscale.setValue(self.train_upscale_factor)
+        self.ui.train_sb_upscale.setValue(self.train_requested_scale)
+        self.ui.train_sb_anchor.setValue(self.train_anchor_scale)
         self.ui.train_sb_maxEpochs.setValue(self.train_max_epochs)
         self.ui.train_sb_batchSize.setValue(self.train_batch_size)
         self.ui.train_sb_ckpt_interval.setValue(self.train_ckpt_interval)
@@ -414,7 +438,8 @@ class Stats(QtWidgets.QMainWindow):
             self.train_show_info(f"Training - input data file: {self.train_input_data_path}")
             self.train_show_info(f"Training - output data path: {self.train_output_data_path}")
             self.train_show_info(f"Training - train_val_split: {self.train_val_split}")
-            self.train_show_info(f"Training - upscale_factor: {self.train_upscale_factor}")
+            self.train_show_info(f"Training - requested scale: {self.train_requested_scale}")
+            self.train_show_info(f"Training - Train_anchor_scale: {self.train_anchor_scale}")
             self.train_show_info(f"Training - max epochs: {self.train_max_epochs}")
             self.train_show_info(f"Training - batch size: {self.train_batch_size}")
             self.train_show_info(f"Training - train_ckpt_interval: {self.train_ckpt_interval}")
@@ -527,8 +552,9 @@ class Stats(QtWidgets.QMainWindow):
         self.test_show_info(f"Load training configs: {self.test_Trainconfig_path}")
 
     def test_upscale_change(self):
-        self.test_upscale_factor = self.ui.test_sb_upscale.value()
-        self.test_show_info(f"Predicting - upscale_factor: {self.test_upscale_factor}")
+        # Keep one decimal place so decimal requested scales stay clean (avoid float noise).
+        self.test_requested_scale = round(self.ui.test_sb_upscale.value(), 1)
+        self.test_show_info(f"Predicting - requested scale: {self.test_requested_scale}")
 
     def test_gpuIds_change(self):
         self.test_gpuIds = self.ui.test_edit_gpuIds.text()
@@ -571,8 +597,8 @@ class Stats(QtWidgets.QMainWindow):
                 test_ckpt_path=self.test_weightPath if isinstance(self.test_weightPath, str) else self.test_weightPath[
                     0],
                 # train_config_path=self.test_Trainconfig_path if isinstance(self.test_Trainconfig_path, str) else self.test_Trainconfig_path[0],
-                test_upscale=self.test_upscale_factor if isinstance(self.test_upscale_factor, int) else
-                self.test_upscale_factor[0],
+                requested_scale=self.test_requested_scale if isinstance(self.test_requested_scale, (int, float)) else
+                self.test_requested_scale[0],
                 test_gpu_ids=self.test_gpuIds if isinstance(self.test_gpuIds, str) else self.test_gpuIds[0],
                 test_inpaint=True if self.ui.test_ckb_inpaint.isChecked() else False,
                 test_inpaint_index=self.test_inpaint_ids if isinstance(self.test_inpaint_ids, str) else
@@ -601,7 +627,7 @@ class Stats(QtWidgets.QMainWindow):
         self.test_output_data_path = self.test_configs['test_output_dir']
         self.test_weightPath = self.test_configs['test_ckpt_path']
         # self.test_Trainconfig_path = self.test_configs['train_config_path']
-        self.test_upscale_factor = self.test_configs['test_upscale']
+        self.test_requested_scale = self.test_configs['requested_scale']
         self.test_gpuIds = self.test_configs['test_gpu_ids']
         self.test_inpaint = True if self.test_configs['test_inpaint'] is True else False
         self.test_inpaint_ids = self.test_configs['test_inpaint_index']
@@ -611,7 +637,7 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.test_edit_output_path.setText(self.test_output_data_path)
         self.ui.edit_test_ckpt_path.setText(self.test_weightPath)
         # self.ui.test_edit_train_config_path.setText(self.test_Trainconfig_path)
-        self.ui.test_sb_upscale.setValue(self.test_upscale_factor)
+        self.ui.test_sb_upscale.setValue(self.test_requested_scale)
         self.ui.test_edit_gpuIds.setText(self.test_gpuIds)
 
         if self.test_inpaint:
@@ -643,7 +669,7 @@ class Stats(QtWidgets.QMainWindow):
         self.test_output_data_path = self.test_configs['test_output_dir']
         self.test_weightPath = self.test_configs['test_ckpt_path']
         # self.test_Trainconfig_path = self.test_configs['train_config_path']
-        self.test_upscale_factor = self.test_configs['test_upscale']
+        self.test_requested_scale = self.test_configs['requested_scale']
         self.test_gpuIds = self.test_configs['test_gpu_ids']
         self.test_inpaint = True if self.test_configs['test_inpaint'] is True else False
         self.test_inpaint_ids = self.test_configs['test_inpaint_index']
@@ -653,7 +679,7 @@ class Stats(QtWidgets.QMainWindow):
         self.ui.test_edit_output_path.setText(self.test_output_data_path)
         self.ui.edit_test_ckpt_path.setText(self.test_weightPath)
         # self.ui.test_edit_train_config_path.setText(self.test_Trainconfig_path)
-        self.ui.test_sb_upscale.setValue(self.test_upscale_factor)
+        self.ui.test_sb_upscale.setValue(self.test_requested_scale)
         self.ui.test_edit_gpuIds.setText(self.test_gpuIds)
 
         if self.test_inpaint:
@@ -700,7 +726,7 @@ class Stats(QtWidgets.QMainWindow):
             self.train_show_info(f"Testing - input data path: {self.test_input_data_path}")
             self.train_show_info(f"Testing - output data path: {self.test_output_data_path}")
             # self.train_show_info(f"Testing - train config path: {self.test_Trainconfig_path}")
-            self.train_show_info(f"Testing - upscale factor: {self.test_upscale_factor}")
+            self.train_show_info(f"Testing - requested scale: {self.test_requested_scale}")
             self.train_show_info(f"Testing - gpu ids: {self.test_gpuIds}")
             self.train_show_info(f"Testing - is_inpaint: {self.test_inpaint}")
             if self.test_inpaint:

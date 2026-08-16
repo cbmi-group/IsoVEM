@@ -66,8 +66,10 @@ The meaning of each argument has been annotated as follows:
 "train_data_pth":"data/demo.tif" # str, input anisotropic data path. tif or h5 is supported.default "data/demo.tif".
 "train_output_dir":"train" # str, output work dir, including /ckpt, /tblogger, /visuals, etc. default "train".
 "train_data_split":0.7 # float from 0-1, the percent of training data in the input data. default 0.7.
-"train_upscale":8 # float, scale factor during training, supporting integers or decimals from 2-12. default 8.
-"train_inpaint":false # bool, whether model learning slice inpainting jointly, default False.
+"requested_scale":8 # float, the scale factor requested by the user during training, supporting integers or decimals from 2-12. It is mapped to the nearest anchor scale for the actual training process. default 8.
+"Train_anchor_scale":8 # int, the fixed anchor scale actually used for training (2/4/8/10), automatically derived from requested_scale by rounding to the nearest anchor. default 8.
+"train_inpaint":false # bool, whether model learning slice inpainting jointly, default False. Please note that local mask-based inpainting and local fusion are not implemented in the released code. Local contamination or damage is handled indirectly by treating the affected slice as a complete slice dropout in the current version, and we have validated that this inpainting method is adequate for achieving greater continuity in the reconstructed ultrastructure.
+
 "train_epoch":200 # int, number of training epoch, default 200.
 "train_bs":2 # int, batch size for training, default 2.
 "train_lr":1e-3 # float, learning rate for training, default 1e-3.
@@ -131,7 +133,7 @@ The meaning of each argument has been annotated as follows:
 "test_data_pth": "data/demo.tif"  # str, input anisotropic data path.
 "test_ckpt_path": "train/checkpoint/model_epoch_1.pth"  # str, pretrained model path for testing.
 "test_output_dir": "test" # str, output work dir, including /result, etc.
-"test_upscale": 8  # float, scale factor during testing (it can be different from training phase), default 8.
+"requested_scale": 8  # float, the scale factor requested by the user during testing (it can be different from training phase), supporting integers or decimals. Isotropic reconstruction is performed directly at this scale. default 8.
 "test_inpaint": true  # bool, whether perform inpainting during testing.
 "test_inpaint_index":  [20,40] # list, the list of slice index (start from 0) along Z-axis to be inpainted. If no need for inpainting, set []. default [].
 "test_gpu_ids": "0" # str, ids of available gpu card. supporting single card now. default "0".
